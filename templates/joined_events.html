@@ -3,27 +3,181 @@
 {% block title %}Joined Events{% endblock %}
 
 {% block content %}
-<div class="card">
-    <h2>Your Joined Events</h2>
+<div class="container py-5">
+    <div class="row mb-4">
+        <div class="col-12">
+            <h1 class="display-4 fw-bold text-center mb-4">Your Joined Events</h1>
+            <p class="lead text-center text-muted mb-5">Manage and view all events you've joined</p>
+        </div>
+    </div>
+
     {% if events %}
-        <div class="events-list">
-            {% for event in events %}
-                <div class="event-card">
-                    <h3>{{ event.title }}</h3>
-                    <p><strong>Date:</strong> {{ event.date.strftime('%Y-%m-%d %H:%M') }}</p>
-                    <p><strong>Venue:</strong> {{ event.venue }}</p>
-                    <p>{{ event.description }}</p>
-                    <div class="event-actions">
-                        <a href="{{ url_for('event_details', event_id=event.id) }}" class="btn">View Details</a>
-                        <form method="POST" action="{{ url_for('exit_event', event_id=event.id) }}" style="display: inline;">
-                            <button type="submit" class="btn btn-danger">Exit Event</button>
-                        </form>
+    <div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 row-cols-xl-4 g-4">
+        {% for event in events %}
+        <div class="col">
+            <div class="card h-100 shadow-sm">
+                <div class="event-image-container">
+                    <img src="{{ event.get_image_url() }}" class="card-img-top" alt="{{ event.title }}">
+                    <div class="event-category-badge">
+                        <span class="badge bg-primary">{{ event.category }}</span>
                     </div>
                 </div>
-            {% endfor %}
+                <div class="card-body">
+                    <h5 class="card-title">{{ event.title }}</h5>
+                    <p class="card-text text-muted">{{ event.description[:100] }}{% if event.description|length > 100 %}...{% endif %}</p>
+                    <div class="event-details">
+                        <div class="detail-item">
+                            <i class="fas fa-calendar-alt"></i>
+                            <span>{{ event.date.strftime('%B %d, %Y') }}</span>
+                        </div>
+                        <div class="detail-item">
+                            <i class="fas fa-clock"></i>
+                            <span>{{ event.date.strftime('%I:%M %p') }}</span>
+                        </div>
+                        <div class="detail-item">
+                            <i class="fas fa-map-marker-alt"></i>
+                            <span>{{ event.venue }}</span>
+                        </div>
+                        <div class="detail-item">
+                            <i class="fas fa-users"></i>
+                            <span>{{ event.capacity }} spots</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="card-footer bg-transparent border-0">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div class="btn-group">
+                            <a href="{{ url_for('event_details', event_id=event.id) }}" class="btn btn-primary btn-sm">
+                                <i class="fas fa-info-circle me-1"></i>Details
+                            </a>
+                            <form action="{{ url_for('exit_event', event_id=event.id) }}" method="POST" class="ms-2">
+                                <button type="submit" class="btn btn-danger btn-sm">
+                                    <i class="fas fa-sign-out-alt me-1"></i>Exit
+                                </button>
+                            </form>
+                        </div>
+                        <span class="text-primary fw-bold">${{ "%.2f"|format(event.price) }}</span>
+                    </div>
+                </div>
+            </div>
         </div>
+        {% endfor %}
+    </div>
     {% else %}
-        <p>You haven't joined any events yet.</p>
+    <div class="text-center py-5">
+        <div class="empty-state">
+            <i class="fas fa-calendar-plus fa-4x text-muted mb-4"></i>
+            <h3>No Joined Events</h3>
+            <p class="text-muted">You haven't joined any events yet. Explore upcoming events to get started!</p>
+            <a href="{{ url_for('upcoming_events') }}" class="btn btn-primary mt-3">
+                <i class="fas fa-search me-2"></i>Explore Events
+            </a>
+        </div>
+    </div>
     {% endif %}
 </div>
+
+<style>
+    .event-image-container {
+        position: relative;
+        height: 200px;
+        overflow: hidden;
+    }
+
+    .event-image-container img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        transition: transform 0.3s ease;
+    }
+
+    .card:hover .event-image-container img {
+        transform: scale(1.05);
+    }
+
+    .event-category-badge {
+        position: absolute;
+        top: 10px;
+        right: 10px;
+    }
+
+    .card {
+        border: none;
+        border-radius: 12px;
+        transition: transform 0.3s ease, box-shadow 0.3s ease;
+    }
+
+    .card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 10px 20px rgba(0, 0, 0, 0.1) !important;
+    }
+
+    .card-title {
+        font-size: 1.1rem;
+        font-weight: 600;
+        margin-bottom: 0.75rem;
+        color: #2c3e50;
+    }
+
+    .card-text {
+        font-size: 0.9rem;
+        margin-bottom: 1rem;
+    }
+
+    .event-details {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 0.5rem;
+        margin-bottom: 1rem;
+    }
+
+    .detail-item {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        font-size: 0.85rem;
+        color: #6c757d;
+    }
+
+    .detail-item i {
+        color: #3498db;
+    }
+
+    .btn-group .btn {
+        border-radius: 8px;
+        padding: 0.5rem 1rem;
+    }
+
+    .empty-state {
+        max-width: 500px;
+        margin: 0 auto;
+        padding: 2rem;
+    }
+
+    .empty-state i {
+        margin-bottom: 1.5rem;
+    }
+
+    /* Night mode styles */
+    .night-mode .card {
+        background-color: #2d2d2d;
+    }
+
+    .night-mode .card-title {
+        color: #ffffff;
+    }
+
+    .night-mode .card-text,
+    .night-mode .detail-item {
+        color: #b0b0b0;
+    }
+
+    .night-mode .empty-state h3 {
+        color: #ffffff;
+    }
+
+    .night-mode .empty-state p {
+        color: #b0b0b0;
+    }
+</style>
 {% endblock %} 

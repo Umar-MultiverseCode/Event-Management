@@ -28,6 +28,10 @@
                 {% if is_organizer %}
                     <a href="{{ url_for('edit_event', event_id=event.id) }}" class="btn">Edit Event</a>
                 {% endif %}
+                <button class="like-btn" onclick="toggleLike({{ event.id }})">
+                    <i class="fas fa-heart {% if has_liked %}liked{% endif %}"></i>
+                    <span id="like-count">{{ event.likes }}</span> Likes
+                </button>
             </div>
         </div>
     </div>
@@ -75,6 +79,31 @@
             <p><strong>Organizer:</strong> {{ event.organizer }}</p>
             <p><strong>Email:</strong> <a href="mailto:{{ event.contact_email }}">{{ event.contact_email }}</a></p>
             <p><strong>Phone:</strong> {{ event.contact_phone }}</p>
+        </div>
+
+        <div class="comments-section">
+            <h3>Comments</h3>
+            
+            <!-- Comment Form -->
+            <form method="POST" action="{{ url_for('add_comment', event_id=event.id) }}" class="comment-form">
+                <textarea name="content" placeholder="Write your comment..." required></textarea>
+                <button type="submit" class="btn btn-primary">Post Comment</button>
+            </form>
+
+            <!-- Comments List -->
+            <div class="comments-list">
+                {% for comment in comments %}
+                <div class="comment">
+                    <div class="comment-header">
+                        <span class="comment-username">{{ comment.username }}</span>
+                        <span class="comment-date">{{ comment.created_at }}</span>
+                    </div>
+                    <div class="comment-content">{{ comment.content }}</div>
+                </div>
+                {% else %}
+                <p class="no-comments">No comments yet. Be the first to comment!</p>
+                {% endfor %}
+            </div>
         </div>
     </div>
 </div>
@@ -131,9 +160,9 @@
     }
 
     .event-actions {
+        margin: 20px 0;
         display: flex;
-        gap: 15px;
-        margin-top: 20px;
+        gap: 20px;
     }
 
     .event-content {
@@ -241,6 +270,89 @@
         text-decoration: underline;
     }
 
+    .like-btn {
+        background: none;
+        border: none;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        gap: 5px;
+        font-size: 1.1em;
+        padding: 8px 15px;
+        border-radius: 20px;
+        transition: all 0.3s ease;
+    }
+
+    .like-btn:hover {
+        background-color: #f0f0f0;
+    }
+
+    .like-btn i {
+        color: #ccc;
+        transition: color 0.3s ease;
+    }
+
+    .like-btn i.liked {
+        color: #ff4444;
+    }
+
+    .comments-section {
+        margin-top: 30px;
+        padding: 20px;
+        background-color: #f8f9fa;
+        border-radius: 8px;
+    }
+
+    .comment-form {
+        margin-bottom: 20px;
+    }
+
+    .comment-form textarea {
+        width: 100%;
+        padding: 10px;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+        margin-bottom: 10px;
+        min-height: 100px;
+        resize: vertical;
+    }
+
+    .comments-list {
+        display: flex;
+        flex-direction: column;
+        gap: 15px;
+    }
+
+    .comment {
+        background-color: white;
+        padding: 15px;
+        border-radius: 8px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+
+    .comment-header {
+        display: flex;
+        justify-content: space-between;
+        margin-bottom: 10px;
+        font-size: 0.9em;
+        color: #666;
+    }
+
+    .comment-username {
+        font-weight: bold;
+        color: #333;
+    }
+
+    .comment-content {
+        line-height: 1.5;
+    }
+
+    .no-comments {
+        text-align: center;
+        color: #666;
+        font-style: italic;
+    }
+
     @media (max-width: 768px) {
         .event-header {
             flex-direction: column;
@@ -267,4 +379,24 @@
         }
     }
 </style>
+
+<script>
+function toggleLike(eventId) {
+    fetch(`/event/${eventId}/like`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        const likeBtn = document.querySelector('.like-btn i');
+        const likeCount = document.getElementById('like-count');
+        
+        likeBtn.classList.toggle('liked');
+        likeCount.textContent = data.likes;
+    })
+    .catch(error => console.error('Error:', error));
+}
+</script>
 {% endblock %} 

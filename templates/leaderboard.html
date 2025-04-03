@@ -3,176 +3,178 @@
 {% block title %}Leaderboard{% endblock %}
 
 {% block content %}
-<div class="leaderboard-container">
-    <div class="leaderboard-header">
-        <h1>Top Event Enthusiasts</h1>
-        <p>See who's leading the pack in event participation and achievements</p>
+<div class="container py-5">
+    <div class="row mb-4">
+        <div class="col-12">
+            <h1 class="display-4 fw-bold text-center mb-4">Leaderboard</h1>
+            <p class="lead text-center text-muted mb-5">Top event organizers and participants</p>
+        </div>
     </div>
 
-    <div class="leaderboard-table">
-        <div class="leaderboard-header-row">
-            <div class="rank">Rank</div>
-            <div class="user">User</div>
-            <div class="level">Level</div>
-            <div class="points">Points</div>
-            <div class="achievements">Achievements</div>
-        </div>
-        
-        {% for user in top_users %}
-            <div class="leaderboard-row {% if user.id == current_user.id %}current-user{% endif %}">
-                <div class="rank">{{ loop.index }}</div>
-                <div class="user">
-                    <div class="user-info">
-                        {% if user.profile_picture %}
-                            <img src="{{ url_for('static', filename='profile_pictures/' + user.profile_picture) }}" alt="{{ user.username }}">
-                        {% else %}
-                            <div class="default-avatar">{{ user.username[0].upper() }}</div>
-                        {% endif %}
-                        <span>{{ user.username }}</span>
+    <div class="row">
+        <!-- Top Organizers -->
+        <div class="col-md-6 mb-4">
+            <div class="card shadow-sm">
+                <div class="card-header bg-primary text-white">
+                    <h3 class="mb-0">Top Organizers</h3>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Rank</th>
+                                    <th>Organizer</th>
+                                    <th>Events</th>
+                                    <th>Participants</th>
+                                    <th>Rating</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for organizer in top_organizers %}
+                                <tr>
+                                    <td class="fw-bold">#{{ loop.index }}</td>
+                                    <td>
+                                        <div class="d-flex align-items-center">
+                                            <div class="avatar-circle me-2">
+                                                <i class="fas fa-user"></i>
+                                            </div>
+                                            <span>{{ organizer.username }}</span>
+                                        </div>
+                                    </td>
+                                    <td>{{ organizer.events_created }}</td>
+                                    <td>{{ organizer.total_participants or 0 }}</td>
+                                    <td>
+                                        <div class="d-flex align-items-center">
+                                            <i class="fas fa-star text-warning me-1"></i>
+                                            {{ "%.1f"|format(organizer.rating or 0) }}
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
                     </div>
                 </div>
-                <div class="level">
-                    <div class="level-badge">Lvl {{ user.points.level if user.points else 1 }}</div>
-                </div>
-                <div class="points">{{ user.points.points if user.points else 0 }}</div>
-                <div class="achievements">{{ user.achievements|length }}</div>
             </div>
-        {% endfor %}
-    </div>
+        </div>
 
-    <div class="leaderboard-actions">
-        <a href="{{ url_for('achievements') }}" class="btn btn-secondary">View Your Achievements</a>
+        <!-- Top Participants -->
+        <div class="col-md-6 mb-4">
+            <div class="card shadow-sm">
+                <div class="card-header bg-success text-white">
+                    <h3 class="mb-0">Top Participants</h3>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Rank</th>
+                                    <th>Participant</th>
+                                    <th>Events</th>
+                                    <th>Points</th>
+                                    <th>Badges</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for participant in top_participants %}
+                                <tr>
+                                    <td class="fw-bold">#{{ loop.index }}</td>
+                                    <td>
+                                        <div class="d-flex align-items-center">
+                                            <div class="avatar-circle me-2">
+                                                <i class="fas fa-user"></i>
+                                            </div>
+                                            <span>{{ participant.username }}</span>
+                                        </div>
+                                    </td>
+                                    <td>{{ participant.events_joined }}</td>
+                                    <td>{{ participant.points }}</td>
+                                    <td>
+                                        {% if participant.badges %}
+                                            {% for badge in participant.badges %}
+                                                <span class="badge bg-info me-1" title="{{ badge.description }}">
+                                                    <i class="fas fa-{{ badge.icon }} me-1"></i>
+                                                    {{ badge.name }}
+                                                </span>
+                                            {% endfor %}
+                                        {% else %}
+                                            <span class="text-muted">No badges yet</span>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
 </div>
 
 <style>
-.leaderboard-container {
-    max-width: 1200px;
-    margin: 0 auto;
-    padding: 2rem;
-}
+    .avatar-circle {
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        background-color: #e9ecef;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: #6c757d;
+    }
 
-.leaderboard-header {
-    text-align: center;
-    margin-bottom: 2rem;
-}
+    .table th {
+        font-weight: 600;
+        color: #2c3e50;
+    }
 
-.leaderboard-header h1 {
-    margin: 0 0 0.5rem;
-    color: var(--text-color);
-}
+    .table td {
+        vertical-align: middle;
+    }
 
-.leaderboard-header p {
-    color: var(--secondary-text);
-    margin: 0;
-}
+    .card {
+        border: none;
+        border-radius: 12px;
+    }
 
-.leaderboard-table {
-    background-color: var(--card-bg);
-    border-radius: 8px;
-    overflow: hidden;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-}
-
-.leaderboard-header-row {
-    display: grid;
-    grid-template-columns: 60px 2fr 1fr 1fr 1fr;
-    padding: 1rem;
-    background-color: var(--primary-color);
-    color: white;
-    font-weight: bold;
-}
-
-.leaderboard-row {
-    display: grid;
-    grid-template-columns: 60px 2fr 1fr 1fr 1fr;
-    padding: 1rem;
-    align-items: center;
-    border-bottom: 1px solid var(--border-color);
-    transition: background-color 0.3s ease;
-}
-
-.leaderboard-row:hover {
-    background-color: var(--bg-color);
-}
-
-.leaderboard-row.current-user {
-    background-color: rgba(var(--primary-color-rgb), 0.1);
-    font-weight: bold;
-}
-
-.rank {
-    text-align: center;
-    font-weight: bold;
-}
-
-.user-info {
-    display: flex;
-    align-items: center;
-    gap: 1rem;
-}
-
-.user-info img {
-    width: 40px;
-    height: 40px;
-    border-radius: 50%;
-    object-fit: cover;
-}
-
-.default-avatar {
-    width: 40px;
-    height: 40px;
-    border-radius: 50%;
-    background-color: var(--primary-color);
-    color: white;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-weight: bold;
-}
-
-.level-badge {
-    background-color: var(--primary-color);
-    color: white;
-    padding: 0.25rem 0.75rem;
-    border-radius: 20px;
-    font-size: 0.9rem;
-    display: inline-block;
-}
-
-.points, .achievements {
-    text-align: center;
-    font-weight: 500;
-}
-
-.leaderboard-actions {
-    text-align: center;
-    margin-top: 2rem;
-}
-
-@media (max-width: 768px) {
-    .leaderboard-container {
+    .card-header {
+        border-radius: 12px 12px 0 0 !important;
         padding: 1rem;
     }
-    
-    .leaderboard-header-row,
-    .leaderboard-row {
-        grid-template-columns: 40px 2fr 1fr;
+
+    .card-header h3 {
+        font-size: 1.5rem;
+        margin: 0;
     }
-    
-    .points, .achievements {
-        display: none;
+
+    .badge {
+        padding: 0.5rem 0.75rem;
+        font-weight: 500;
     }
-    
-    .user-info {
-        gap: 0.5rem;
+
+    /* Night mode styles */
+    .night-mode .card {
+        background-color: #2d2d2d;
     }
-    
-    .user-info img,
-    .default-avatar {
-        width: 30px;
-        height: 30px;
+
+    .night-mode .table {
+        color: #ffffff;
     }
-}
+
+    .night-mode .table th {
+        color: #ffffff;
+    }
+
+    .night-mode .avatar-circle {
+        background-color: #404040;
+        color: #ffffff;
+    }
+
+    .night-mode .text-muted {
+        color: #b0b0b0 !important;
+    }
 </style>
 {% endblock %} 

@@ -1,0 +1,188 @@
+{% extends "base.html" %}
+
+{% block title %}Edit Event{% endblock %}
+
+{% block content %}
+<div class="container py-5">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="card shadow-sm">
+                <div class="card-body p-4">
+                    <h2 class="card-title text-center mb-4">Edit Event</h2>
+                    
+                    <form method="POST" enctype="multipart/form-data">
+                        <!-- Basic Information -->
+                        <div class="mb-4">
+                            <h4 class="mb-3">Basic Information</h4>
+                            <div class="mb-3">
+                                <label for="title" class="form-label">Event Title</label>
+                                <input type="text" class="form-control" id="title" name="title" value="{{ event.title }}" required>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label for="description" class="form-label">Description</label>
+                                <textarea class="form-control" id="description" name="description" rows="4" required>{{ event.description }}</textarea>
+                            </div>
+                            
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label for="date" class="form-label">Date and Time</label>
+                                    <input type="datetime-local" class="form-control" id="date" name="date" value="{{ event.date.strftime('%Y-%m-%dT%H:%M') }}" required>
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label for="venue" class="form-label">Venue</label>
+                                    <input type="text" class="form-control" id="venue" name="venue" value="{{ event.venue }}" required>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Event Details -->
+                        <div class="mb-4">
+                            <h4 class="mb-3">Event Details</h4>
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label for="category" class="form-label">Category</label>
+                                    <select class="form-select" id="category" name="category" required>
+                                        <option value="Technology" {% if event.category == 'Technology' %}selected{% endif %}>Technology</option>
+                                        <option value="Music" {% if event.category == 'Music' %}selected{% endif %}>Music</option>
+                                        <option value="Business" {% if event.category == 'Business' %}selected{% endif %}>Business</option>
+                                        <option value="Sports" {% if event.category == 'Sports' %}selected{% endif %}>Sports</option>
+                                        <option value="Art" {% if event.category == 'Art' %}selected{% endif %}>Art</option>
+                                        <option value="Food" {% if event.category == 'Food' %}selected{% endif %}>Food</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label for="capacity" class="form-label">Capacity</label>
+                                    <input type="number" class="form-control" id="capacity" name="capacity" value="{{ event.capacity }}" required>
+                                </div>
+                            </div>
+                            
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label for="price" class="form-label">Price ($)</label>
+                                    <input type="number" step="0.01" class="form-control" id="price" name="price" value="{{ event.price }}" required>
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label for="registration_deadline" class="form-label">Registration Deadline</label>
+                                    <input type="datetime-local" class="form-control" id="registration_deadline" name="registration_deadline" value="{{ event.registration_deadline.strftime('%Y-%m-%dT%H:%M') }}" required>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Additional Information -->
+                        <div class="mb-4">
+                            <h4 class="mb-3">Additional Information</h4>
+                            <div class="mb-3">
+                                <label for="requirements" class="form-label">Requirements</label>
+                                <textarea class="form-control" id="requirements" name="requirements" rows="2">{{ event.requirements }}</textarea>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label for="schedule" class="form-label">Schedule</label>
+                                <textarea class="form-control" id="schedule" name="schedule" rows="3">{{ event.schedule }}</textarea>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label for="speakers" class="form-label">Speakers</label>
+                                <textarea class="form-control" id="speakers" name="speakers" rows="2">{{ event.speakers }}</textarea>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label for="sponsors" class="form-label">Sponsors</label>
+                                <textarea class="form-control" id="sponsors" name="sponsors" rows="2">{{ event.sponsors }}</textarea>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label for="tags" class="form-label">Tags (comma-separated)</label>
+                                <input type="text" class="form-control" id="tags" name="tags" value="{{ event.tags }}">
+                            </div>
+                        </div>
+                        
+                        <!-- Image Upload -->
+                        <div class="mb-4">
+                            <h4 class="mb-3">Event Image</h4>
+                            <div class="mb-3">
+                                <label for="image" class="form-label">Upload New Image</label>
+                                <input type="file" class="form-control" id="image" name="image" accept="image/*">
+                            </div>
+                            {% if event.image_path %}
+                            <div class="current-image mb-3">
+                                <label class="form-label">Current Image</label>
+                                <img src="{{ url_for('uploaded_file', filename=event.image_path) }}" class="img-thumbnail" style="max-height: 200px;">
+                            </div>
+                            {% endif %}
+                        </div>
+                        
+                        <!-- Submit Button -->
+                        <div class="d-grid gap-2">
+                            <button type="submit" class="btn btn-primary">Save Changes</button>
+                            <a href="{{ url_for('event_details', event_id=event.id) }}" class="btn btn-secondary">Cancel</a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .card {
+        border: none;
+        border-radius: 12px;
+    }
+    
+    .form-label {
+        font-weight: 500;
+        color: #2c3e50;
+    }
+    
+    .form-control, .form-select {
+        border-radius: 8px;
+        border: 1px solid #dee2e6;
+        padding: 0.75rem;
+    }
+    
+    .form-control:focus, .form-select:focus {
+        border-color: #3498db;
+        box-shadow: 0 0 0 0.2rem rgba(52, 152, 219, 0.25);
+    }
+    
+    .btn-primary {
+        background-color: #3498db;
+        border-color: #3498db;
+        padding: 0.75rem;
+        font-weight: 500;
+    }
+    
+    .btn-secondary {
+        background-color: #6c757d;
+        border-color: #6c757d;
+        padding: 0.75rem;
+        font-weight: 500;
+    }
+    
+    /* Night mode styles */
+    .night-mode .card {
+        background-color: #2d2d2d;
+        color: #ffffff;
+    }
+    
+    .night-mode .form-label {
+        color: #ffffff;
+    }
+    
+    .night-mode .form-control,
+    .night-mode .form-select {
+        background-color: #1a1a1a;
+        border-color: #404040;
+        color: #ffffff;
+    }
+    
+    .night-mode .form-control:focus,
+    .night-mode .form-select:focus {
+        background-color: #1a1a1a;
+        border-color: #3498db;
+        color: #ffffff;
+    }
+</style>
+{% endblock %} 

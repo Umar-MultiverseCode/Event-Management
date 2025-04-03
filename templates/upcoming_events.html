@@ -3,31 +3,319 @@
 {% block title %}Upcoming Events{% endblock %}
 
 {% block content %}
-<div class="card">
-    <h2>Upcoming Events</h2>
-    {% if events %}
-        <div class="events-list">
-            {% for event in events %}
-                <div class="event-card">
-                    <h3>{{ event.title }}</h3>
-                    <p><strong>Date:</strong> {{ event.date.strftime('%Y-%m-%d %H:%M') }}</p>
-                    <p><strong>Venue:</strong> {{ event.venue }}</p>
-                    <p>{{ event.description }}</p>
-                    <div class="event-actions">
-                        <a href="{{ url_for('event_details', event_id=event.id) }}" class="btn">View Details</a>
-                        {% if event not in current_user.joined_events %}
-                            <form method="POST" action="{{ url_for('join_event', event_id=event.id) }}" style="display: inline;">
-                                <button type="submit" class="btn">Join Event</button>
+<div class="container-fluid px-4 py-5">
+    <div class="row mb-4">
+        <div class="col-12">
+            <h1 class="display-4 fw-bold text-center mb-4">Upcoming Events</h1>
+            <p class="lead text-center text-muted mb-5">Discover and join exciting events happening around you</p>
+        </div>
+    </div>
+
+    <!-- Search and Filter Section -->
+    <div class="row mb-5">
+        <div class="col-md-6">
+            <form class="d-flex" action="{{ url_for('upcoming_events') }}" method="GET">
+                <div class="input-group">
+                    <span class="input-group-text bg-white border-end-0">
+                        <i class="fas fa-search text-muted"></i>
+                    </span>
+                    <input class="form-control border-start-0" type="search" name="search" placeholder="Search events..." value="{{ search_query }}">
+                    <button class="btn btn-primary px-4" type="submit">Search</button>
+                </div>
+            </form>
+        </div>
+        <div class="col-md-6">
+            <div class="d-flex justify-content-end">
+                <div class="btn-group shadow-sm">
+                    <a href="{{ url_for('upcoming_events', sort='date') }}" class="btn btn-light {% if sort_by == 'date' %}active bg-primary text-white{% endif %}">
+                        <i class="fas fa-calendar-alt me-2"></i>Date
+                    </a>
+                    <a href="{{ url_for('upcoming_events', sort='price') }}" class="btn btn-light {% if sort_by == 'price' %}active bg-primary text-white{% endif %}">
+                        <i class="fas fa-dollar-sign me-2"></i>Price
+                    </a>
+                    <a href="{{ url_for('upcoming_events', sort='category') }}" class="btn btn-light {% if sort_by == 'category' %}active bg-primary text-white{% endif %}">
+                        <i class="fas fa-tags me-2"></i>Category
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Events Grid -->
+    <div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 row-cols-xl-4 g-4">
+        {% for event in events %}
+        <div class="col">
+            <div class="card h-100 event-card shadow-sm">
+                <!-- Event Image -->
+                <div class="card-img-top event-image" style="background-image: url('{{ event.image_url or url_for('static', filename='images/default-event.jpg') }}');">
+                    {% if event.is_featured %}
+                    <span class="badge bg-primary position-absolute top-0 end-0 m-2">
+                        <i class="fas fa-star me-1"></i>Featured
+                    </span>
+                    {% endif %}
+                </div>
+                
+                <div class="card-body p-3">
+                    <!-- Event Category -->
+                    <div class="mb-2">
+                        <span class="badge bg-info text-dark px-2 py-1">
+                            <i class="fas fa-tag me-1"></i>{{ event.category }}
+                        </span>
+                    </div>
+                    
+                    <!-- Event Title -->
+                    <h5 class="card-title fw-bold mb-2 text-dark">{{ event.title }}</h5>
+                    
+                    <!-- Event Date and Time -->
+                    <div class="event-details mb-2">
+                        <div class="d-flex align-items-center mb-1">
+                            <i class="fas fa-calendar-alt text-primary me-2"></i>
+                            <span class="text-dark small">{{ event.date.strftime('%B %d, %Y') }}</span>
+                        </div>
+                        <div class="d-flex align-items-center mb-1">
+                            <i class="fas fa-clock text-primary me-2"></i>
+                            <span class="text-dark small">{{ event.date.strftime('%I:%M %p') }}</span>
+                        </div>
+                        <div class="d-flex align-items-center">
+                            <i class="fas fa-map-marker-alt text-primary me-2"></i>
+                            <span class="text-dark small">{{ event.venue }}</span>
+                        </div>
+                    </div>
+                    
+                    <!-- Event Price -->
+                    <div class="event-price mb-2">
+                        <span class="h5 text-success fw-bold">${{ "%.2f"|format(event.price) }}</span>
+                        <small class="text-muted ms-1">per person</small>
+                    </div>
+                    
+                    <!-- Event Description (truncated) -->
+                    <p class="card-text text-dark mb-3 small">{{ event.description[:100] }}{% if event.description|length > 100 %}...{% endif %}</p>
+                    
+                    <!-- Event Footer -->
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div class="btn-group">
+                            <a href="{{ url_for('event_details', event_id=event.id) }}" class="btn btn-primary btn-sm px-3">
+                                <i class="fas fa-info-circle me-1"></i>Details
+                            </a>
+                            {% if current_user.is_authenticated %}
+                            <form action="{{ url_for('join_event', event_id=event.id) }}" method="POST" class="ms-2">
+                                <button type="submit" class="btn btn-success btn-sm px-3">
+                                    <i class="fas fa-user-plus me-1"></i>Join
+                                </button>
                             </form>
-                        {% else %}
-                            <span style="color: green; font-weight: bold;">Already Joined</span>
-                        {% endif %}
+                            {% endif %}
+                        </div>
+                        <div class="text-muted">
+                            <small>
+                                <i class="fas fa-users me-1"></i>
+                                {{ event.capacity }} spots
+                            </small>
+                        </div>
                     </div>
                 </div>
-            {% endfor %}
+            </div>
         </div>
-    {% else %}
-        <p>No upcoming events available.</p>
-    {% endif %}
+        {% else %}
+        <div class="col-12">
+            <div class="alert alert-info text-center py-4">
+                <i class="fas fa-info-circle fa-2x mb-3"></i>
+                <h4 class="alert-heading">No events found</h4>
+                <p>Please try different search criteria or check back later for new events.</p>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
 </div>
+
+<style>
+    .event-card {
+        transition: all 0.3s ease;
+        border: none;
+        border-radius: 12px;
+        overflow: hidden;
+        background-color: #ffffff;
+    }
+    
+    .event-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 10px 20px rgba(0, 0, 0, 0.1) !important;
+    }
+    
+    .event-image {
+        height: 180px;
+        background-size: cover;
+        background-position: center;
+        position: relative;
+    }
+    
+    .event-details {
+        color: #666;
+        font-size: 0.85rem;
+    }
+    
+    .card-title {
+        color: #2c3e50;
+        font-weight: 600;
+        line-height: 1.4;
+        font-size: 1.1rem;
+    }
+    
+    .card-text {
+        font-size: 0.85rem;
+        line-height: 1.5;
+        color: #2c3e50;
+    }
+    
+    .badge {
+        font-weight: 500;
+        padding: 0.4em 0.8em;
+        border-radius: 50px;
+        font-size: 0.75rem;
+    }
+    
+    .btn-primary {
+        background-color: #3498db;
+        border-color: #3498db;
+        padding: 0.4rem 1rem;
+        border-radius: 50px;
+        font-weight: 500;
+        font-size: 0.85rem;
+    }
+    
+    .btn-primary:hover {
+        background-color: #2980b9;
+        border-color: #2980b9;
+    }
+
+    .btn-success {
+        background-color: #2ecc71;
+        border-color: #2ecc71;
+        padding: 0.4rem 1rem;
+        border-radius: 50px;
+        font-weight: 500;
+        font-size: 0.85rem;
+    }
+    
+    .btn-success:hover {
+        background-color: #27ae60;
+        border-color: #27ae60;
+    }
+    
+    .btn-light {
+        border-radius: 50px;
+        padding: 0.4rem 1rem;
+    }
+    
+    .btn-light.active {
+        background-color: #3498db;
+        border-color: #3498db;
+        color: white;
+    }
+    
+    .input-group-text {
+        border-radius: 50px 0 0 50px;
+    }
+    
+    .form-control {
+        border-radius: 0 50px 50px 0;
+    }
+    
+    .text-success {
+        color: #2ecc71 !important;
+    }
+    
+    .text-primary {
+        color: #3498db !important;
+    }
+
+    /* Improved text contrast */
+    .text-dark {
+        color: #2c3e50 !important;
+    }
+
+    .text-muted {
+        color: #7f8c8d !important;
+    }
+
+    /* Better spacing */
+    .card-body {
+        padding: 1rem;
+    }
+
+    .mb-2 {
+        margin-bottom: 0.5rem !important;
+    }
+
+    .mb-3 {
+        margin-bottom: 1rem !important;
+    }
+
+    /* Improved badge contrast */
+    .badge.bg-info {
+        background-color: #d1ecf1 !important;
+        color: #0c5460 !important;
+    }
+
+    /* Better hover effect */
+    .event-card:hover .card-title {
+        color: #3498db;
+    }
+
+    /* Improved price visibility */
+    .event-price {
+        font-size: 1.1rem;
+    }
+
+    /* Better description text */
+    .card-text {
+        color: #34495e;
+        font-size: 0.85rem;
+        line-height: 1.5;
+    }
+
+    /* Responsive adjustments */
+    @media (max-width: 576px) {
+        .event-image {
+            height: 160px;
+        }
+        
+        .card-title {
+            font-size: 1rem;
+        }
+        
+        .card-text {
+            font-size: 0.8rem;
+        }
+        
+        .btn-primary, .btn-success {
+            padding: 0.3rem 0.8rem;
+            font-size: 0.8rem;
+        }
+    }
+
+    /* Night mode styles */
+    .night-mode {
+        background-color: #1a1a1a;
+        color: #ffffff;
+    }
+
+    .night-mode .card {
+        background-color: #2d2d2d;
+        color: #ffffff;
+    }
+
+    .night-mode .card-title,
+    .night-mode .card-text,
+    .night-mode .text-dark {
+        color: #ffffff !important;
+    }
+
+    .night-mode .text-muted {
+        color: #b3b3b3 !important;
+    }
+
+    .night-mode .event-details {
+        color: #b3b3b3;
+    }
+</style>
 {% endblock %} 

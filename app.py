@@ -14,6 +14,7 @@ from sklearn.metrics.pairwise import cosine_similarity
 import pandas as pd
 from collections import defaultdict
 import time
+from sqlalchemy import func
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'your-secret-key'
@@ -101,6 +102,19 @@ class UserPoints(db.Model):
     level = db.Column(db.Integer, default=1)
     user = db.relationship('User', backref=db.backref('points', uselist=False))
 
+# User Event Like model
+class UserEventLike(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    event_id = db.Column(db.Integer, db.ForeignKey('event.id'), nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    # Add unique constraint to prevent duplicate likes
+    __table_args__ = (db.UniqueConstraint('user_id', 'event_id', name='unique_user_event_like'),)
+
+    def __repr__(self):
+        return f'<UserEventLike {self.user_id} -> {self.event_id}>'
+
 # Update User model
 class User(UserMixin, db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -113,6 +127,9 @@ class User(UserMixin, db.Model):
     last_seen = db.Column(db.DateTime, default=datetime.utcnow)
     events = db.relationship('Event', secondary='user_events', backref=db.backref('attendees', lazy='dynamic'))
     preferences = db.Column(db.Text)  # JSON string for user preferences
+    
+    # Add likes relationship
+    liked_events = db.relationship('UserEventLike', backref='user', lazy=True)
 
     def __init__(self, **kwargs):
         super(User, self).__init__(**kwargs)
@@ -257,6 +274,9 @@ class Event(db.Model):
     views = db.Column(db.Integer, default=0)
     revenue = db.Column(db.Float, default=0.0)
     chat_messages = db.relationship('ChatMessage', backref='event', lazy=True)
+    
+    # Add likes relationship
+    user_likes = db.relationship('UserEventLike', backref='event', lazy=True)
 
     def get_image_url(self):
         if self.image_path:
@@ -476,13 +496,52 @@ def register():
 @app.route('/dashboard')
 @login_required
 def dashboard():
-    return render_template('dashboard.html')
+    # Get user's created events count
+    created_events = Event.query.filter_by(organizer_id=current_user.id).count()
+    
+    # Get user's joined events count
+    joined_events = UserEventLike.query.filter_by(user_id=current_user.id).count()
+    
+    # Get user's points from UserPoints model
+    points = UserPoints.query.filter_by(user_id=current_user.id).first()
+    total_points = points.points if points else 0
+    
+    # Get user's badges count from UserAchievement model
+    badges = UserAchievement.query.filter_by(user_id=current_user.id).count()
+    
+    # Get upcoming events
+    upcoming_events = Event.query.filter(
+        Event.date >= datetime.now(),
+        Event.organizer_id == current_user.id
+    ).order_by(Event.date.asc()).limit(6).all()
+    
+    # Prepare stats dictionary
+    stats = {
+        'created_events': created_events,
+        'joined_events': joined_events,
+        'points': total_points,
+        'badges': badges
+    }
+    
+    return render_template('dashboard.html', stats=stats, upcoming_events=upcoming_events)
 
 @app.route('/upcoming_events')
 @login_required
 def upcoming_events():
-    upcoming_events = Event.query.filter(Event.date > datetime.now()).all()
-    return render_template('upcoming_events.html', events=upcoming_events)
+    # Get current date
+    current_date = datetime.utcnow()
+    
+    # Query upcoming events
+    events = Event.query.filter(
+        Event.date > current_date
+    ).order_by(Event.date.asc()).all()
+    
+    # Debug print
+    print(f"Found {len(events)} upcoming events")
+    for event in events:
+        print(f"Event: {event.title}, Date: {event.date}")
+    
+    return render_template('upcoming_events.html', events=events)
 
 @app.route('/joined_events')
 @login_required
@@ -496,6 +555,24 @@ def event_details(event_id):
     event = Event.query.get_or_404(event_id)
     is_organizer = event.organizer_id == current_user.id
     is_registered = event in current_user.events
+    
+    # Get comments with formatted dates
+    comments = EventComment.query.filter_by(event_id=event_id).order_by(EventComment.created_at.desc()).all()
+    formatted_comments = []
+    for comment in comments:
+        user = User.query.get(comment.user_id)
+        formatted_comments.append({
+            'id': comment.id,
+            'content': comment.content,
+            'username': user.username,
+            'created_at': comment.created_at.strftime('%B %d, %Y at %I:%M %p')
+        })
+    
+    # Check if current user has liked the event
+    has_liked = UserEventLike.query.filter_by(
+        user_id=current_user.id,
+        event_id=event_id
+    ).first() is not None
     
     # Check for achievements
     if is_registered:
@@ -511,7 +588,9 @@ def event_details(event_id):
     return render_template('event_details.html', 
                          event=event,
                          is_organizer=is_organizer,
-                         is_registered=is_registered)
+                         is_registered=is_registered,
+                         comments=formatted_comments,
+                         has_liked=has_liked)
 
 @app.route('/exit_event/<int:event_id>', methods=['POST'])
 @login_required
@@ -583,132 +662,119 @@ def allowed_file(filename):
 
 def init_db():
     """Initialize the database with sample data"""
-    # Check if database already exists
-    if os.path.exists('events.db'):
-        print("Database already exists. Skipping initialization.")
-        return
+    with app.app_context():
+        # Drop all existing tables
+        db.drop_all()
+        # Create all tables
+        db.create_all()
         
-    # Create all tables
-    db.create_all()
-    
-    # Create a test user
-    test_user = User(
-        username='test',
-        email=f'test{int(time.time())}@example.com',
-        password=generate_password_hash('test123')
-    )
-    db.session.add(test_user)
-    
-    # Create sample events
-    events = [
-        Event(
-            title="Tech Conference 2024",
-            description="Annual technology conference featuring the latest innovations in AI, blockchain, and cloud computing.",
-            date=datetime.utcnow() + timedelta(days=30),
-            venue="Convention Center",
-            category="Technology",
-            capacity=500,
-            price=99.99,
-            organizer="Tech Events Inc.",
-            contact_email="info@techevents.com",
-            contact_phone="+1 (555) 123-4567",
-            requirements="Basic knowledge of technology concepts",
-            schedule="9:00 AM - Registration\n10:00 AM - Keynote\n12:00 PM - Lunch\n2:00 PM - Workshops\n5:00 PM - Networking",
-            speakers="John Smith - AI Expert\nJane Doe - Blockchain Specialist",
-            sponsors="TechCorp\nInnovateLabs",
-            tags="technology,conference,AI,blockchain",
-            registration_deadline=datetime.utcnow() + timedelta(days=25),
-            is_featured=True
-        ),
-        Event(
-            title="Music Festival 2024",
-            description="Three-day music festival featuring top artists from around the world.",
-            date=datetime.utcnow() + timedelta(days=45),
-            venue="Central Park",
-            category="Music",
-            capacity=10000,
-            price=149.99,
-            organizer="Music Events Co.",
-            contact_email="info@musicfest.com",
-            contact_phone="+1 (555) 987-6543",
-            requirements="Valid ID required",
-            schedule="Friday: 4:00 PM - 11:00 PM\nSaturday: 2:00 PM - 11:00 PM\nSunday: 2:00 PM - 10:00 PM",
-            speakers="Various Artists",
-            sponsors="MusicStream\nSoundSystems",
-            tags="music,festival,concert",
-            registration_deadline=datetime.utcnow() + timedelta(days=40),
-            is_featured=True
-        ),
-        Event(
-            title="Startup Pitch Competition",
-            description="Annual competition where startups pitch their ideas to investors.",
-            date=datetime.utcnow() + timedelta(days=60),
-            venue="Innovation Hub",
-            category="Business",
-            capacity=200,
-            price=49.99,
-            organizer="Startup Network",
-            contact_email="info@startupcomp.com",
-            contact_phone="+1 (555) 456-7890",
-            requirements="Business plan submission",
-            schedule="9:00 AM - Registration\n10:00 AM - Pitch Sessions\n1:00 PM - Lunch\n3:00 PM - Final Presentations\n6:00 PM - Awards",
-            speakers="Sarah Johnson - VC Partner\nMichael Chen - Startup Mentor",
-            sponsors="VentureCapital\nStartupFund",
-            tags="startup,pitch,competition,business",
-            registration_deadline=datetime.utcnow() + timedelta(days=55),
-            is_featured=True
+        # Create a test user
+        test_user = User(
+            username='test',
+            email='test@example.com'
         )
-    ]
-    
-    # Add more random events
-    categories = ["Technology", "Music", "Business", "Sports", "Art", "Food", "Education"]
-    venues = ["Convention Center", "Central Park", "City Hall", "Sports Arena", "Art Gallery", "University Hall", "Community Center"]
-    organizers = ["Events Inc.", "Local Community", "Professional Association", "Cultural Center", "Sports Club"]
-    
-    for i in range(17):  # Add 17 more events to reach 20 total
-        random_days = random.randint(1, 90)
-        event = Event(
-            title=f"Event {i+4}",
-            description=f"Description for Event {i+4}",
-            date=datetime.utcnow() + timedelta(days=random_days),
-            venue=random.choice(venues),
-            category=random.choice(categories),
-            capacity=random.randint(50, 1000),
-            price=random.uniform(0, 200),
-            organizer=random.choice(organizers),
-            contact_email=f"info@event{i+4}.com",
-            contact_phone=f"+1 (555) {random.randint(100,999)}-{random.randint(1000,9999)}",
-            requirements="None specified",
-            schedule="To be announced",
-            speakers="To be announced",
-            sponsors="Various sponsors",
-            tags="event,general",
-            registration_deadline=datetime.utcnow() + timedelta(days=random_days-5),
-            is_featured=random.choice([True, False])
-        )
-        events.append(event)
-    
-    # Add all events to the database
-    for event in events:
-        db.session.add(event)
-    
-    # Commit all changes
-    db.session.commit()
-    print("Database initialized with sample data.")
+        test_user.set_password('test123')
+        db.session.add(test_user)
+        db.session.commit()
+        
+        # Create sample events
+        current_date = datetime.utcnow()
+        
+        # Event categories and their details
+        categories = {
+            'Technology': {
+                'venues': ['Tech Hub', 'Innovation Center', 'Digital Campus', 'Tech Park'],
+                'organizers': ['Tech Events Inc.', 'Digital Solutions', 'Innovation Labs', 'Tech World'],
+                'tags': ['technology', 'AI', 'blockchain', 'cloud', 'cybersecurity'],
+                'image_url': 'https://images.unsplash.com/photo-1518770660439-4636190af475?ixlib=rb-1.2.1&auto=format&fit=crop&w=1350&q=80'
+            },
+            'Music': {
+                'venues': ['Concert Hall', 'Music Arena', 'Live House', 'Festival Grounds'],
+                'organizers': ['Music Events Co.', 'Sound Productions', 'Live Music Network', 'Festival Organizers'],
+                'tags': ['music', 'concert', 'festival', 'live', 'performance'],
+                'image_url': 'https://images.unsplash.com/photo-1470229722913-7c0e2dbbafd3?ixlib=rb-1.2.1&auto=format&fit=crop&w=1350&q=80'
+            },
+            'Business': {
+                'venues': ['Business Center', 'Conference Hall', 'Corporate Hub', 'Trade Center'],
+                'organizers': ['Business Network', 'Corporate Events', 'Trade Association', 'Business Solutions'],
+                'tags': ['business', 'networking', 'conference', 'workshop', 'seminar'],
+                'image_url': 'https://images.unsplash.com/photo-1542744173-8e7e53415bb0?ixlib=rb-1.2.1&auto=format&fit=crop&w=1350&q=80'
+            },
+            'Sports': {
+                'venues': ['Sports Arena', 'Stadium', 'Sports Complex', 'Fitness Center'],
+                'organizers': ['Sports Events', 'Fitness Network', 'Athletic Association', 'Sports Management'],
+                'tags': ['sports', 'fitness', 'competition', 'tournament', 'athletics'],
+                'image_url': 'https://images.unsplash.com/photo-1517649763962-0c623066013b?ixlib=rb-1.2.1&auto=format&fit=crop&w=1350&q=80'
+            },
+            'Art': {
+                'venues': ['Art Gallery', 'Museum', 'Cultural Center', 'Exhibition Hall'],
+                'organizers': ['Art Society', 'Cultural Events', 'Creative Network', 'Art Foundation'],
+                'tags': ['art', 'exhibition', 'culture', 'creative', 'gallery'],
+                'image_url': 'https://images.unsplash.com/photo-1500462918059-b1a0cb512f1d?ixlib=rb-1.2.1&auto=format&fit=crop&w=1350&q=80'
+            },
+            'Food': {
+                'venues': ['Food Court', 'Culinary Center', 'Restaurant', 'Food Festival Grounds'],
+                'organizers': ['Food Events', 'Culinary Network', 'Food Festival', 'Gourmet Society'],
+                'tags': ['food', 'culinary', 'cooking', 'gourmet', 'festival'],
+                'image_url': 'https://images.unsplash.com/photo-1504674900247-0877df9cc836?ixlib=rb-1.2.1&auto=format&fit=crop&w=1350&q=80'
+            }
+        }
+        
+        # Create 30 events
+        events = []
+        for i in range(30):
+            # Randomly select category
+            category = random.choice(list(categories.keys()))
+            cat_details = categories[category]
+            
+            # Generate random dates between 1 and 90 days from now
+            days_from_now = random.randint(1, 90)
+            event_date = current_date + timedelta(days=days_from_now)
+            
+            # Create event
+            event = Event(
+                title=f"{category} Event {i+1}",
+                description=f"Join us for an exciting {category.lower()} event featuring industry experts and networking opportunities. This event will showcase the latest trends and developments in the field.",
+                date=event_date,
+                venue=random.choice(cat_details['venues']),
+                category=category,
+                capacity=random.randint(50, 1000),
+                price=random.uniform(0, 200),
+                organizer=random.choice(cat_details['organizers']),
+                contact_email=f"info@{random.choice(cat_details['organizers']).lower().replace(' ', '')}.com",
+                contact_phone=f"+1 ({random.randint(100, 999)}) {random.randint(100, 999)}-{random.randint(1000, 9999)}",
+                requirements="No specific requirements",
+                schedule=f"9:00 AM - Registration\n10:00 AM - Main Event\n12:00 PM - Lunch\n2:00 PM - Activities\n5:00 PM - Networking",
+                speakers=f"Expert Speaker {random.randint(1, 5)}",
+                sponsors=f"Sponsor {random.randint(1, 3)}",
+                tags=','.join(random.sample(cat_details['tags'], 3)),
+                registration_deadline=event_date - timedelta(days=random.randint(1, 7)),
+                is_featured=random.choice([True, False]),
+                organizer_id=test_user.id,
+                created_by=test_user.id,
+                image_url=cat_details['image_url']  # Add image URL based on category
+            )
+            events.append(event)
+        
+        # Add all events to the database
+        for event in events:
+            db.session.add(event)
+        
+        # Commit all changes
+        db.session.commit()
+        print("Database initialized with 30 sample events.")
 
 @app.route('/event/<int:event_id>/comment', methods=['POST'])
 @login_required
 def add_comment(event_id):
     event = Event.query.get_or_404(event_id)
     content = request.form.get('content')
-    parent_id = request.form.get('parent_id')
     
     if content:
         comment = EventComment(
             event_id=event_id,
             user_id=current_user.id,
-            content=content,
-            parent_id=parent_id if parent_id else None
+            content=content
         )
         db.session.add(comment)
         db.session.commit()
@@ -751,8 +817,26 @@ def rate_event(event_id):
 @login_required
 def like_event(event_id):
     event = Event.query.get_or_404(event_id)
-    event.increment_likes()
-    return jsonify({'likes': event.likes})
+    user_like = UserEventLike.query.filter_by(
+        user_id=current_user.id,
+        event_id=event_id
+    ).first()
+    
+    if user_like:
+        db.session.delete(user_like)
+        event.likes -= 1
+        action = 'unliked'
+    else:
+        user_like = UserEventLike(user_id=current_user.id, event_id=event_id)
+        db.session.add(user_like)
+        event.likes += 1
+        action = 'liked'
+    
+    db.session.commit()
+    return jsonify({
+        'likes': event.likes,
+        'action': action
+    })
 
 @app.route('/event/<int:event_id>/share', methods=['POST'])
 @login_required
@@ -851,10 +935,66 @@ def achievements():
                          achievements=all_achievements,
                          user_achievements=user_achievements)
 
+@app.route('/toggle_night_mode', methods=['POST'])
+def toggle_night_mode():
+    session['night_mode'] = not session.get('night_mode', False)
+    return jsonify({'success': True})
+
 @app.route('/leaderboard')
 def leaderboard():
-    top_users = User.query.join(UserPoints).order_by(UserPoints.points.desc()).limit(10).all()
-    return render_template('leaderboard.html', top_users=top_users)
+    # Get top organizers
+    top_organizers = User.query.join(Event, User.id == Event.organizer_id)\
+        .outerjoin(EventRating, Event.id == EventRating.event_id)\
+        .group_by(User.id)\
+        .with_entities(
+            User.id,
+            User.username,
+            func.count(Event.id).label('events_created'),
+            func.sum(Event.capacity).label('total_participants'),
+            func.coalesce(func.avg(EventRating.rating), 0).label('rating')
+        )\
+        .order_by(func.count(Event.id).desc())\
+        .limit(10)\
+        .all()
+
+    # Get top participants
+    top_participants = User.query.join(UserPoints, User.id == UserPoints.user_id)\
+        .group_by(User.id)\
+        .with_entities(
+            User.id,
+            User.username,
+            func.count(UserEventLike.id).label('events_joined'),
+            func.coalesce(UserPoints.points, 0).label('points')
+        )\
+        .order_by(func.coalesce(UserPoints.points, 0).desc())\
+        .limit(10)\
+        .all()
+
+    # Add badges to participants
+    for participant in top_participants:
+        participant.badges = []
+        if participant.events_joined >= 10:
+            participant.badges.append({
+                'name': 'Event Enthusiast',
+                'icon': 'star',
+                'description': 'Joined 10 or more events'
+            })
+        if participant.points >= 100:
+            participant.badges.append({
+                'name': 'High Scorer',
+                'icon': 'trophy',
+                'description': 'Earned 100 or more points'
+            })
+        if participant.events_joined >= 5 and participant.points >= 50:
+            participant.badges.append({
+                'name': 'Active Member',
+                'icon': 'award',
+                'description': 'Active participation in events'
+            })
+
+    return render_template('leaderboard.html', 
+                         top_organizers=top_organizers,
+                         top_participants=top_participants)
 
 # Add route to serve uploaded files
 @app.route('/uploads/<path:filename>')
@@ -878,8 +1018,109 @@ def similar_events(event_id):
                          event=event,
                          similar_events=similar_events)
 
+@app.route('/event/<int:event_id>/edit', methods=['GET', 'POST'])
+@login_required
+def edit_event(event_id):
+    event = Event.query.get_or_404(event_id)
+    
+    # Check if user is the organizer
+    if event.organizer_id != current_user.id:
+        flash('You are not authorized to edit this event.', 'error')
+        return redirect(url_for('event_details', event_id=event_id))
+    
+    if request.method == 'POST':
+        # Update event details
+        event.title = request.form.get('title', event.title)
+        event.description = request.form.get('description', event.description)
+        event.date = datetime.strptime(request.form.get('date'), '%Y-%m-%dT%H:%M')
+        event.venue = request.form.get('venue', event.venue)
+        event.category = request.form.get('category', event.category)
+        event.capacity = int(request.form.get('capacity', event.capacity))
+        event.price = float(request.form.get('price', event.price))
+        event.requirements = request.form.get('requirements', event.requirements)
+        event.schedule = request.form.get('schedule', event.schedule)
+        event.speakers = request.form.get('speakers', event.speakers)
+        event.sponsors = request.form.get('sponsors', event.sponsors)
+        event.tags = request.form.get('tags', event.tags)
+        event.registration_deadline = datetime.strptime(request.form.get('registration_deadline'), '%Y-%m-%dT%H:%M')
+        
+        # Handle image upload
+        if 'image' in request.files:
+            file = request.files['image']
+            if file and allowed_file(file.filename):
+                filename = secure_filename(f"{event.id}_{file.filename}")
+                file.save(os.path.join(app.config['UPLOAD_FOLDER'], 'events', filename))
+                event.image_path = os.path.join('events', filename)
+        
+        db.session.commit()
+        flash('Event updated successfully!', 'success')
+        return redirect(url_for('event_details', event_id=event_id))
+    
+    return render_template('edit_event.html', event=event)
+
+@app.route('/create_event', methods=['GET', 'POST'])
+@login_required
+def create_event():
+    if request.method == 'POST':
+        title = request.form.get('title')
+        description = request.form.get('description')
+        date = datetime.strptime(request.form.get('date'), '%Y-%m-%dT%H:%M')
+        venue = request.form.get('venue')
+        category = request.form.get('category')
+        capacity = int(request.form.get('capacity'))
+        price = float(request.form.get('price'))
+        requirements = request.form.get('requirements')
+        schedule = request.form.get('schedule')
+        speakers = request.form.get('speakers')
+        sponsors = request.form.get('sponsors')
+        tags = request.form.get('tags')
+        registration_deadline = datetime.strptime(request.form.get('registration_deadline'), '%Y-%m-%dT%H:%M')
+        
+        # Handle image upload
+        image_path = None
+        if 'image' in request.files:
+            file = request.files['image']
+            if file and allowed_file(file.filename):
+                filename = secure_filename(f"{current_user.id}_{datetime.now().strftime('%Y%m%d%H%M%S')}_{file.filename}")
+                file.save(os.path.join(app.config['UPLOAD_FOLDER'], 'events', filename))
+                image_path = os.path.join('events', filename)
+        
+        event = Event(
+            title=title,
+            description=description,
+            date=date,
+            venue=venue,
+            category=category,
+            capacity=capacity,
+            price=price,
+            requirements=requirements,
+            schedule=schedule,
+            speakers=speakers,
+            sponsors=sponsors,
+            tags=tags,
+            registration_deadline=registration_deadline,
+            image_path=image_path,
+            organizer_id=current_user.id,
+            created_by=current_user.id
+        )
+        
+        db.session.add(event)
+        db.session.commit()
+        
+        flash('Event created successfully!', 'success')
+        return redirect(url_for('event_details', event_id=event.id))
+    
+    return render_template('create_event.html')
+
 if __name__ == '__main__':
-    # Only initialize the database if it doesn't exist
-    if not os.path.exists('events.db'):
-        init_db()
+    # Initialize the database
+    with app.app_context():
+        # Check if database exists
+        if not os.path.exists('events.db'):
+            print("Creating new database...")
+            init_db()
+        else:
+            print("Database already exists. Skipping initialization.")
+    
+    # Run the application
     socketio.run(app, debug=True) 
