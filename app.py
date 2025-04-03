@@ -970,31 +970,34 @@ def leaderboard():
         .limit(10)\
         .all()
 
-    # Add badges to participants
+    # Create a dictionary to store badges for each participant
+    participant_badges = {}
     for participant in top_participants:
-        participant.badges = []
+        badges = []
         if participant.events_joined >= 10:
-            participant.badges.append({
+            badges.append({
                 'name': 'Event Enthusiast',
                 'icon': 'star',
                 'description': 'Joined 10 or more events'
             })
         if participant.points >= 100:
-            participant.badges.append({
+            badges.append({
                 'name': 'High Scorer',
                 'icon': 'trophy',
                 'description': 'Earned 100 or more points'
             })
         if participant.events_joined >= 5 and participant.points >= 50:
-            participant.badges.append({
+            badges.append({
                 'name': 'Active Member',
                 'icon': 'award',
                 'description': 'Active participation in events'
             })
+        participant_badges[participant.id] = badges
 
     return render_template('leaderboard.html', 
                          top_organizers=top_organizers,
-                         top_participants=top_participants)
+                         top_participants=top_participants,
+                         participant_badges=participant_badges)
 
 # Add route to serve uploaded files
 @app.route('/uploads/<path:filename>')

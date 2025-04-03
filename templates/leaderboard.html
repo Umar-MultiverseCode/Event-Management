@@ -1,180 +1,199 @@
 {% extends "base.html" %}
 
-{% block title %}Leaderboard{% endblock %}
+{% block title %}Leaderboard - EventHub{% endblock %}
 
 {% block content %}
-<div class="container py-5">
-    <div class="row mb-4">
-        <div class="col-12">
-            <h1 class="display-4 fw-bold text-center mb-4">Leaderboard</h1>
-            <p class="lead text-center text-muted mb-5">Top event organizers and participants</p>
-        </div>
-    </div>
-
-    <div class="row">
-        <!-- Top Organizers -->
-        <div class="col-md-6 mb-4">
-            <div class="card shadow-sm">
-                <div class="card-header bg-primary text-white">
-                    <h3 class="mb-0">Top Organizers</h3>
-                </div>
-                <div class="card-body">
-                    <div class="table-responsive">
-                        <table class="table table-hover">
-                            <thead>
-                                <tr>
-                                    <th>Rank</th>
-                                    <th>Organizer</th>
-                                    <th>Events</th>
-                                    <th>Participants</th>
-                                    <th>Rating</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {% for organizer in top_organizers %}
-                                <tr>
-                                    <td class="fw-bold">#{{ loop.index }}</td>
-                                    <td>
-                                        <div class="d-flex align-items-center">
-                                            <div class="avatar-circle me-2">
-                                                <i class="fas fa-user"></i>
-                                            </div>
-                                            <span>{{ organizer.username }}</span>
-                                        </div>
-                                    </td>
-                                    <td>{{ organizer.events_created }}</td>
-                                    <td>{{ organizer.total_participants or 0 }}</td>
-                                    <td>
-                                        <div class="d-flex align-items-center">
-                                            <i class="fas fa-star text-warning me-1"></i>
-                                            {{ "%.1f"|format(organizer.rating or 0) }}
-                                        </div>
-                                    </td>
-                                </tr>
-                                {% endfor %}
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
+<div class="leaderboard-container">
+    <div class="container">
+        <!-- Top Organizers Section -->
+        <div class="section mb-5">
+            <h2 class="section-title mb-4">Top Organizers</h2>
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead>
+                        <tr>
+                            <th>Rank</th>
+                            <th>Organizer</th>
+                            <th>Events Created</th>
+                            <th>Total Participants</th>
+                            <th>Average Rating</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for organizer in top_organizers %}
+                        <tr>
+                            <td>{{ loop.index }}</td>
+                            <td>
+                                <div class="d-flex align-items-center">
+                                    <div class="avatar-circle me-2">
+                                        <i class="fas fa-user"></i>
+                                    </div>
+                                    {{ organizer.username }}
+                                </div>
+                            </td>
+                            <td>{{ organizer.events_created }}</td>
+                            <td>{{ organizer.total_participants or 0 }}</td>
+                            <td>
+                                <div class="rating">
+                                    {% for i in range(5) %}
+                                        {% if i < organizer.rating|int %}
+                                            <i class="fas fa-star text-warning"></i>
+                                        {% else %}
+                                            <i class="far fa-star text-warning"></i>
+                                        {% endif %}
+                                    {% endfor %}
+                                    <span class="ms-2">({{ "%.1f"|format(organizer.rating) }})</span>
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
             </div>
         </div>
 
-        <!-- Top Participants -->
-        <div class="col-md-6 mb-4">
-            <div class="card shadow-sm">
-                <div class="card-header bg-success text-white">
-                    <h3 class="mb-0">Top Participants</h3>
-                </div>
-                <div class="card-body">
-                    <div class="table-responsive">
-                        <table class="table table-hover">
-                            <thead>
-                                <tr>
-                                    <th>Rank</th>
-                                    <th>Participant</th>
-                                    <th>Events</th>
-                                    <th>Points</th>
-                                    <th>Badges</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {% for participant in top_participants %}
-                                <tr>
-                                    <td class="fw-bold">#{{ loop.index }}</td>
-                                    <td>
-                                        <div class="d-flex align-items-center">
-                                            <div class="avatar-circle me-2">
-                                                <i class="fas fa-user"></i>
-                                            </div>
-                                            <span>{{ participant.username }}</span>
-                                        </div>
-                                    </td>
-                                    <td>{{ participant.events_joined }}</td>
-                                    <td>{{ participant.points }}</td>
-                                    <td>
-                                        {% if participant.badges %}
-                                            {% for badge in participant.badges %}
-                                                <span class="badge bg-info me-1" title="{{ badge.description }}">
-                                                    <i class="fas fa-{{ badge.icon }} me-1"></i>
-                                                    {{ badge.name }}
-                                                </span>
-                                            {% endfor %}
-                                        {% else %}
-                                            <span class="text-muted">No badges yet</span>
-                                        {% endif %}
-                                    </td>
-                                </tr>
-                                {% endfor %}
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
+        <!-- Top Participants Section -->
+        <div class="section">
+            <h2 class="section-title mb-4">Top Participants</h2>
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead>
+                        <tr>
+                            <th>Rank</th>
+                            <th>Participant</th>
+                            <th>Events Joined</th>
+                            <th>Points</th>
+                            <th>Badges</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for participant in top_participants %}
+                        <tr>
+                            <td>{{ loop.index }}</td>
+                            <td>
+                                <div class="d-flex align-items-center">
+                                    <div class="avatar-circle me-2">
+                                        <i class="fas fa-user"></i>
+                                    </div>
+                                    {{ participant.username }}
+                                </div>
+                            </td>
+                            <td>{{ participant.events_joined }}</td>
+                            <td>{{ participant.points }}</td>
+                            <td>
+                                <div class="badges">
+                                    {% for badge in participant_badges[participant.id] %}
+                                    <span class="badge bg-primary me-1" title="{{ badge.description }}">
+                                        <i class="fas fa-{{ badge.icon }} me-1"></i>
+                                        {{ badge.name }}
+                                    </span>
+                                    {% endfor %}
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
             </div>
         </div>
     </div>
 </div>
 
 <style>
+    .leaderboard-container {
+        padding: 2rem 0;
+    }
+
+    .section-title {
+        color: var(--dark-color);
+        font-weight: 600;
+        position: relative;
+        padding-bottom: 0.5rem;
+    }
+
+    .section-title::after {
+        content: '';
+        position: absolute;
+        bottom: 0;
+        left: 0;
+        width: 50px;
+        height: 3px;
+        background: var(--primary-color);
+    }
+
     .avatar-circle {
         width: 40px;
         height: 40px;
+        background: rgba(52, 152, 219, 0.1);
         border-radius: 50%;
-        background-color: #e9ecef;
         display: flex;
         align-items: center;
         justify-content: center;
-        color: #6c757d;
+        color: var(--primary-color);
+    }
+
+    .table {
+        background: white;
+        border-radius: 0.5rem;
+        overflow: hidden;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
     }
 
     .table th {
+        background: #f8f9fa;
+        border-bottom: 2px solid #dee2e6;
         font-weight: 600;
-        color: #2c3e50;
     }
 
     .table td {
         vertical-align: middle;
     }
 
-    .card {
-        border: none;
-        border-radius: 12px;
-    }
-
-    .card-header {
-        border-radius: 12px 12px 0 0 !important;
-        padding: 1rem;
-    }
-
-    .card-header h3 {
-        font-size: 1.5rem;
-        margin: 0;
+    .badges {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5rem;
     }
 
     .badge {
+        font-size: 0.8rem;
         padding: 0.5rem 0.75rem;
-        font-weight: 500;
+        border-radius: 1rem;
     }
 
     /* Night mode styles */
-    .night-mode .card {
-        background-color: #2d2d2d;
-    }
-
     .night-mode .table {
-        color: #ffffff;
+        background: #2d2d2d;
+        color: white;
     }
 
     .night-mode .table th {
-        color: #ffffff;
+        background: #404040;
+        color: white;
+    }
+
+    .night-mode .table td {
+        color: white;
     }
 
     .night-mode .avatar-circle {
-        background-color: #404040;
-        color: #ffffff;
+        background: rgba(255,255,255,0.1);
+        color: white;
     }
 
-    .night-mode .text-muted {
-        color: #b0b0b0 !important;
+    @media (max-width: 768px) {
+        .table-responsive {
+            margin: 0;
+        }
+        
+        .badges {
+            flex-direction: column;
+        }
+        
+        .badge {
+            width: 100%;
+            margin-bottom: 0.5rem;
+        }
     }
 </style>
 {% endblock %} 
