@@ -1,0 +1,47 @@
+{% if events %}
+    <div class="results-count">
+        Found {{ events|length }} events
+    </div>
+    
+    <div class="events-grid">
+        {% for event in events %}
+        <div class="event-card">
+            <div class="event-image">
+                <img src="{{ event.get_image_url() }}" alt="{{ event.title }}">
+            </div>
+            
+            <div class="event-content">
+                <h3>{{ event.title }}</h3>
+                <div class="event-meta">
+                    <span class="date">
+                        <i class="fas fa-calendar"></i>
+                        {{ event.date.strftime('%B %d, %Y') }}
+                    </span>
+                    <span class="venue">
+                        <i class="fas fa-map-marker-alt"></i>
+                        {{ event.venue }}
+                    </span>
+                </div>
+                <p class="description">{{ event.description[:150] }}...</p>
+                <div class="event-footer">
+                    <span class="category">{{ event.category }}</span>
+                    <span class="price">
+                        {% if event.price == 0 %}
+                            Free
+                        {% else %}
+                            ${{ "%.2f"|format(event.price) }}
+                        {% endif %}
+                    </span>
+                </div>
+                <a href="{{ url_for('event_details', event_id=event.id) }}" class="view-details">View Details</a>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+{% else %}
+    <div class="no-results">
+        <i class="fas fa-search"></i>
+        <p>No events found matching your criteria.</p>
+        <a href="{{ url_for('search_events') }}" class="clear-filters">Clear Filters</a>
+    </div>
+{% endif %} 

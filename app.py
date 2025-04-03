@@ -878,53 +878,96 @@ def analytics():
 
 @app.route('/search')
 def search_events():
-    query = request.args.get('q', '')
-    category = request.args.get('category')
-    min_price = request.args.get('min_price')
-    max_price = request.args.get('max_price')
-    date_from = request.args.get('date_from')
-    date_to = request.args.get('date_to')
-    
-    # Start with base query
-    events_query = Event.query
-    
-    # Apply filters
-    if query:
-        events_query = events_query.filter(
-            (Event.title.ilike(f'%{query}%')) |
-            (Event.description.ilike(f'%{query}%')) |
-            (Event.tags.ilike(f'%{query}%'))
-        )
-    
-    if category:
-        events_query = events_query.filter_by(category=category)
-    
-    if min_price:
-        events_query = events_query.filter(Event.price >= float(min_price))
-    
-    if max_price:
-        events_query = events_query.filter(Event.price <= float(max_price))
-    
-    if date_from:
-        events_query = events_query.filter(Event.date >= datetime.strptime(date_from, '%Y-%m-%d'))
-    
-    if date_to:
-        events_query = events_query.filter(Event.date <= datetime.strptime(date_to, '%Y-%m-%d'))
-    
-    # Get unique categories for filter dropdown
-    categories = db.session.query(Event.category.distinct()).all()
-    
-    events = events_query.all()
-    return render_template('search.html',
-        events=events,
-        categories=[c[0] for c in categories],
-        query=query,
-        selected_category=category,
-        min_price=min_price,
-        max_price=max_price,
-        date_from=date_from,
-        date_to=date_to
-    )
+    try:
+        # Get search parameters
+        query = request.args.get('q', '').strip()
+        selected_category = request.args.get('category', '')
+        date_from = request.args.get('date_from', '')
+        date_to = request.args.get('date_to', '')
+        min_price = request.args.get('min_price', '')
+        max_price = request.args.get('max_price', '')
+
+        # Get all unique categories for the filter dropdown
+        categories = db.session.query(Event.category).distinct().all()
+        categories = [category[0] for category in categories if category[0]]
+
+        # Base query
+        events_query = Event.query
+
+        # Apply search query filter
+        if query:
+            # Convert query to lowercase for case-insensitive search
+            query = query.lower()
+            
+            # Create search conditions for each field
+            search_conditions = [
+                func.lower(Event.title).like(f'%{query}%'),
+                func.lower(Event.description).like(f'%{query}%'),
+                func.lower(Event.venue).like(f'%{query}%'),
+                func.lower(Event.category).like(f'%{query}%'),
+                func.lower(Event.organizer).like(f'%{query}%'),
+                func.lower(Event.tags).like(f'%{query}%')
+            ]
+            
+            # Combine conditions with OR to match any field
+            events_query = events_query.filter(db.or_(*search_conditions))
+
+        # Apply category filter
+        if selected_category:
+            events_query = events_query.filter(Event.category == selected_category)
+
+        # Apply date range filter
+        if date_from:
+            try:
+                date_from_obj = datetime.strptime(date_from, '%Y-%m-%d')
+                events_query = events_query.filter(Event.date >= date_from_obj)
+            except ValueError:
+                pass
+
+        if date_to:
+            try:
+                date_to_obj = datetime.strptime(date_to, '%Y-%m-%d')
+                events_query = events_query.filter(Event.date <= date_to_obj)
+            except ValueError:
+                pass
+
+        # Apply price range filter
+        if min_price:
+            try:
+                min_price_float = float(min_price)
+                events_query = events_query.filter(Event.price >= min_price_float)
+            except ValueError:
+                pass
+
+        if max_price:
+            try:
+                max_price_float = float(max_price)
+                events_query = events_query.filter(Event.price <= max_price_float)
+            except ValueError:
+                pass
+
+        # Get filtered events
+        events = events_query.order_by(Event.date.asc()).all()
+
+        # Check if it's an AJAX request
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return render_template('search_results.html', events=events)
+        else:
+            return render_template('search.html',
+                                events=events,
+                                query=query,
+                                selected_category=selected_category,
+                                date_from=date_from,
+                                date_to=date_to,
+                                min_price=min_price,
+                                max_price=max_price,
+                                categories=categories)
+    except Exception as e:
+        print(f"Search error: {str(e)}")
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return render_template('search_results.html', events=[])
+        else:
+            return render_template('search.html', events=[], categories=[])
 
 @app.route('/achievements')
 @login_required

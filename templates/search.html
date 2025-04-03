@@ -7,49 +7,56 @@
     <h1>Search Events</h1>
     
     <div class="search-filters">
-        <form method="GET" class="search-form">
-            <div class="form-group">
-                <input type="text" name="query" placeholder="Search events..." value="{{ request.args.get('query', '') }}" class="search-input">
+        <form method="GET" action="{{ url_for('search_events') }}" class="search-form" id="searchForm">
+            <div class="search-bar">
+                <div class="input-group">
+                    <span class="input-group-text">
+                        <i class="fas fa-search"></i>
+                    </span>
+                    <input type="text" name="q" id="searchInput" placeholder="Search events..." value="{{ query }}" class="form-control" autocomplete="off">
+                    <button type="button" id="searchButton" class="btn btn-primary">
+                        <i class="fas fa-search me-2"></i>Search
+                    </button>
+                </div>
             </div>
             
             <div class="filter-group">
-                <div class="form-group">
+                <div class="filter-item">
                     <label for="category">Category</label>
-                    <select name="category" id="category" class="filter-select">
+                    <select name="category" id="category" class="form-select">
                         <option value="">All Categories</option>
                         {% for category in categories %}
-                        <option value="{{ category }}" {% if request.args.get('category') == category %}selected{% endif %}>
+                        <option value="{{ category }}" {% if selected_category == category %}selected{% endif %}>
                             {{ category }}
                         </option>
                         {% endfor %}
                     </select>
                 </div>
                 
-                <div class="form-group">
-                    <label for="date">Date Range</label>
-                    <select name="date" id="date" class="filter-select">
-                        <option value="">Any Time</option>
-                        <option value="today" {% if request.args.get('date') == 'today' %}selected{% endif %}>Today</option>
-                        <option value="week" {% if request.args.get('date') == 'week' %}selected{% endif %}>This Week</option>
-                        <option value="month" {% if request.args.get('date') == 'month' %}selected{% endif %}>This Month</option>
-                    </select>
+                <div class="filter-item">
+                    <label for="date_from">Date From</label>
+                    <input type="date" name="date_from" id="date_from" class="form-control" value="{{ date_from }}">
                 </div>
                 
-                <div class="form-group">
-                    <label for="price">Price Range</label>
-                    <select name="price" id="price" class="filter-select">
-                        <option value="">Any Price</option>
-                        <option value="free" {% if request.args.get('price') == 'free' %}selected{% endif %}>Free</option>
-                        <option value="paid" {% if request.args.get('price') == 'paid' %}selected{% endif %}>Paid</option>
-                    </select>
+                <div class="filter-item">
+                    <label for="date_to">Date To</label>
+                    <input type="date" name="date_to" id="date_to" class="form-control" value="{{ date_to }}">
+                </div>
+                
+                <div class="filter-item">
+                    <label for="min_price">Min Price</label>
+                    <input type="number" name="min_price" id="min_price" class="form-control" placeholder="Min" value="{{ min_price }}" min="0" step="0.01">
+                </div>
+                
+                <div class="filter-item">
+                    <label for="max_price">Max Price</label>
+                    <input type="number" name="max_price" id="max_price" class="form-control" placeholder="Max" value="{{ max_price }}" min="0" step="0.01">
                 </div>
             </div>
-            
-            <button type="submit" class="search-button">Search</button>
         </form>
     </div>
     
-    <div class="search-results">
+    <div class="search-results" id="searchResults">
         {% if events %}
             <div class="results-count">
                 Found {{ events|length }} events
@@ -100,6 +107,117 @@
     </div>
 </div>
 
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const searchInput = document.getElementById('searchInput');
+    const searchButton = document.getElementById('searchButton');
+    const searchResults = document.getElementById('searchResults');
+    let searchTimeout;
+    let isSearching = false;
+
+    function getSearchParams() {
+        const params = new URLSearchParams();
+        const query = searchInput.value.trim();
+        if (query) {
+            params.append('q', query);
+        }
+        
+        // Add filter values
+        const filters = ['category', 'date_from', 'date_to', 'min_price', 'max_price'];
+        filters.forEach(filterId => {
+            const filter = document.getElementById(filterId);
+            if (filter && filter.value) {
+                params.append(filterId, filter.value);
+            }
+        });
+        
+        return params.toString();
+    }
+
+    function performSearch() {
+        if (isSearching) return;
+        isSearching = true;
+
+        // Show loading state
+        searchResults.innerHTML = `
+            <div class="loading">
+                <i class="fas fa-spinner fa-spin"></i>
+                <p>Searching events...</p>
+            </div>
+        `;
+
+        const searchParams = getSearchParams();
+        const url = `/search?${searchParams}`;
+        
+        fetch(url, {
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest'
+            }
+        })
+        .then(response => {
+            if (!response.ok) {
+                throw new Error('Network response was not ok');
+            }
+            return response.text();
+        })
+        .then(html => {
+            const parser = new DOMParser();
+            const doc = parser.parseFromString(html, 'text/html');
+            const newResults = doc.getElementById('searchResults');
+            if (newResults) {
+                searchResults.innerHTML = newResults.innerHTML;
+            }
+        })
+        .catch(error => {
+            console.error('Search error:', error);
+            searchResults.innerHTML = `
+                <div class="error">
+                    <i class="fas fa-exclamation-circle"></i>
+                    <p>An error occurred while searching. Please try again.</p>
+                </div>
+            `;
+        })
+        .finally(() => {
+            isSearching = false;
+        });
+    }
+
+    // Handle search input
+    searchInput.addEventListener('input', function() {
+        clearTimeout(searchTimeout);
+        const query = this.value.trim();
+        
+        searchTimeout = setTimeout(() => {
+            performSearch();
+        }, 300); // 300ms delay before searching
+    });
+
+    // Handle search button click
+    searchButton.addEventListener('click', function(e) {
+        e.preventDefault();
+        performSearch();
+    });
+
+    // Handle filter changes
+    const filters = ['category', 'date_from', 'date_to', 'min_price', 'max_price'];
+    filters.forEach(filterId => {
+        const filter = document.getElementById(filterId);
+        if (filter) {
+            filter.addEventListener('change', function() {
+                performSearch();
+            });
+        }
+    });
+
+    // Prevent form submission
+    const searchForm = document.getElementById('searchForm');
+    searchForm.addEventListener('submit', function(e) {
+        e.preventDefault();
+        performSearch();
+    });
+});
+</script>
+
 <style>
     .search-container {
         max-width: 1200px;
@@ -121,19 +239,27 @@
         gap: 20px;
     }
 
-    .form-group {
-        display: flex;
-        flex-direction: column;
-        gap: 8px;
+    .search-bar {
+        margin-bottom: 20px;
     }
 
-    .search-input {
-        padding: 15px;
-        border: 2px solid var(--input-bg);
-        border-radius: 8px;
-        font-size: 1.1rem;
-        background: var(--input-bg);
-        color: var(--text-color);
+    .search-bar .input-group {
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+
+    .search-bar .input-group-text {
+        background: white;
+        border-right: none;
+    }
+
+    .search-bar .form-control {
+        border-left: none;
+        border-right: none;
+        padding: 12px;
+    }
+
+    .search-bar .btn {
+        padding: 12px 24px;
     }
 
     .filter-group {
@@ -142,27 +268,30 @@
         gap: 20px;
     }
 
-    .filter-select {
-        padding: 12px;
-        border: 2px solid var(--input-bg);
+    .filter-item {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+    }
+
+    .filter-item label {
+        font-weight: 500;
+        color: var(--text-color);
+    }
+
+    .filter-item .form-control,
+    .filter-item .form-select {
+        padding: 10px;
+        border: 1px solid var(--border-color);
         border-radius: 8px;
         background: var(--input-bg);
         color: var(--text-color);
     }
 
-    .search-button {
-        padding: 12px 24px;
-        background: #4a90e2;
-        color: white;
-        border: none;
-        border-radius: 8px;
-        cursor: pointer;
-        font-size: 1.1rem;
-        transition: background-color 0.3s ease;
-    }
-
-    .search-button:hover {
-        background: #357abd;
+    .filter-item .form-control:focus,
+    .filter-item .form-select:focus {
+        border-color: var(--primary-color);
+        box-shadow: 0 0 0 0.2rem rgba(74, 144, 226, 0.25);
     }
 
     .results-count {
@@ -214,7 +343,7 @@
         flex-direction: column;
         gap: 10px;
         margin-bottom: 15px;
-        color: #666;
+        color: var(--text-muted);
     }
 
     .event-meta span {
@@ -224,7 +353,7 @@
     }
 
     .event-meta i {
-        color: #4a90e2;
+        color: var(--primary-color);
     }
 
     .description {
@@ -241,7 +370,7 @@
     }
 
     .category {
-        background: #4a90e2;
+        background: var(--primary-color);
         color: white;
         padding: 5px 10px;
         border-radius: 15px;
@@ -257,7 +386,7 @@
         display: block;
         text-align: center;
         padding: 10px;
-        background: #4a90e2;
+        background: var(--primary-color);
         color: white;
         text-decoration: none;
         border-radius: 8px;
@@ -265,7 +394,8 @@
     }
 
     .view-details:hover {
-        background: #357abd;
+        background: var(--primary-dark);
+        color: white;
     }
 
     .no-results {
@@ -278,7 +408,7 @@
 
     .no-results i {
         font-size: 3rem;
-        color: #4a90e2;
+        color: var(--primary-color);
         margin-bottom: 20px;
     }
 
@@ -288,13 +418,69 @@
     }
 
     .clear-filters {
-        color: #4a90e2;
+        color: var(--primary-color);
         text-decoration: none;
         font-weight: bold;
     }
 
     .clear-filters:hover {
         text-decoration: underline;
+    }
+
+    .loading {
+        text-align: center;
+        padding: 40px;
+    }
+
+    .loading i {
+        font-size: 2rem;
+        color: var(--primary-color);
+        margin-bottom: 20px;
+    }
+
+    .loading p {
+        color: var(--text-color);
+    }
+
+    .error {
+        text-align: center;
+        padding: 40px;
+        background: var(--card-bg);
+        border-radius: 12px;
+        box-shadow: 0 4px 15px var(--shadow-color);
+    }
+
+    .error i {
+        font-size: 3rem;
+        color: #dc3545;
+        margin-bottom: 20px;
+    }
+
+    .error p {
+        color: var(--text-color);
+    }
+
+    /* Night mode styles */
+    .night-mode .search-filters {
+        background: #2d2d2d;
+    }
+
+    .night-mode .search-bar .input-group-text,
+    .night-mode .search-bar .form-control {
+        background: #1a1a1a;
+        border-color: #404040;
+        color: white;
+    }
+
+    .night-mode .filter-item .form-control,
+    .night-mode .filter-item .form-select {
+        background: #1a1a1a;
+        border-color: #404040;
+        color: white;
+    }
+
+    .night-mode .filter-item label {
+        color: white;
     }
 
     @media (max-width: 768px) {
@@ -304,6 +490,10 @@
 
         .events-grid {
             grid-template-columns: 1fr;
+        }
+
+        .search-bar .btn {
+            padding: 12px;
         }
     }
 </style>
