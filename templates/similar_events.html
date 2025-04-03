@@ -1,0 +1,172 @@
+{% extends "base.html" %}
+
+{% block title %}Similar Events to {{ event.title }}{% endblock %}
+
+{% block content %}
+<div class="similar-events-container">
+    <div class="current-event">
+        <h1>Similar Events to</h1>
+        <h2>{{ event.title }}</h2>
+        <div class="event-meta">
+            <span class="category">{{ event.category }}</span>
+            <span class="date">{{ event.date.strftime('%B %d, %Y at %I:%M %p') }}</span>
+            <span class="venue">{{ event.venue }}</span>
+        </div>
+    </div>
+
+    {% if similar_events %}
+    <div class="similar-events-grid">
+        {% for similar_event in similar_events %}
+        <div class="similar-event-card">
+            <div class="event-image">
+                <img src="{{ similar_event.get_image_url() }}" alt="{{ similar_event.title }}">
+            </div>
+            <div class="event-info">
+                <h3>{{ similar_event.title }}</h3>
+                <div class="event-meta">
+                    <span class="category">{{ similar_event.category }}</span>
+                    <span class="date">{{ similar_event.date.strftime('%B %d, %Y at %I:%M %p') }}</span>
+                    <span class="venue">{{ similar_event.venue }}</span>
+                </div>
+                <p class="description">{{ similar_event.description[:150] }}...</p>
+                <div class="event-actions">
+                    <a href="{{ url_for('event_details', event_id=similar_event.id) }}" class="btn">View Details</a>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="no-similar-events">
+        <p>No similar events found at the moment.</p>
+        <a href="{{ url_for('event_details', event_id=event.id) }}" class="btn">Back to Event</a>
+    </div>
+    {% endif %}
+</div>
+
+<style>
+    .similar-events-container {
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 40px 20px;
+    }
+
+    .current-event {
+        text-align: center;
+        margin-bottom: 40px;
+        padding: 30px;
+        background: var(--card-bg);
+        border-radius: 12px;
+        box-shadow: 0 4px 15px var(--shadow-color);
+    }
+
+    .current-event h1 {
+        font-size: 2rem;
+        color: var(--text-color);
+        margin-bottom: 10px;
+    }
+
+    .current-event h2 {
+        font-size: 2.5rem;
+        color: var(--heading-color);
+        margin-bottom: 20px;
+    }
+
+    .event-meta {
+        display: flex;
+        gap: 15px;
+        justify-content: center;
+        flex-wrap: wrap;
+    }
+
+    .event-meta span {
+        padding: 5px 15px;
+        background: rgba(52, 152, 219, 0.1);
+        border-radius: 20px;
+        color: #3498db;
+        font-size: 0.9rem;
+    }
+
+    .similar-events-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+        gap: 30px;
+    }
+
+    .similar-event-card {
+        background: var(--card-bg);
+        border-radius: 12px;
+        overflow: hidden;
+        box-shadow: 0 4px 15px var(--shadow-color);
+        transition: transform 0.3s ease;
+    }
+
+    .similar-event-card:hover {
+        transform: translateY(-5px);
+    }
+
+    .event-image {
+        height: 180px;
+        overflow: hidden;
+    }
+
+    .event-image img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+    }
+
+    .event-info {
+        padding: 20px;
+    }
+
+    .event-info h3 {
+        font-size: 1.3rem;
+        color: var(--heading-color);
+        margin-bottom: 15px;
+    }
+
+    .description {
+        color: var(--text-color);
+        line-height: 1.6;
+        margin-bottom: 20px;
+    }
+
+    .event-actions {
+        display: flex;
+        justify-content: flex-end;
+    }
+
+    .no-similar-events {
+        text-align: center;
+        padding: 40px;
+        background: var(--card-bg);
+        border-radius: 12px;
+        box-shadow: 0 4px 15px var(--shadow-color);
+    }
+
+    .no-similar-events p {
+        color: var(--text-color);
+        margin-bottom: 20px;
+        font-size: 1.1rem;
+    }
+
+    @media (max-width: 768px) {
+        .similar-events-container {
+            padding: 20px;
+        }
+
+        .current-event h1 {
+            font-size: 1.5rem;
+        }
+
+        .current-event h2 {
+            font-size: 2rem;
+        }
+
+        .similar-events-grid {
+            grid-template-columns: 1fr;
+        }
+    }
+</style>
+{% endblock %} 

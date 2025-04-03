@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, redirect, url_for, flash, jsonify
+from flask import Flask, render_template, request, redirect, url_for, flash, jsonify, send_from_directory
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager, UserMixin, login_user, login_required, logout_user, current_user
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -8,13 +8,22 @@ from flask_socketio import SocketIO, emit, join_room, leave_room
 import os
 from werkzeug.utils import secure_filename
 import json
+import numpy as np
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.metrics.pairwise import cosine_similarity
+import pandas as pd
+from collections import defaultdict
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'your-secret-key'
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///events.db'
-app.config['UPLOAD_FOLDER'] = 'static/profile_pictures'
+app.config['UPLOAD_FOLDER'] = 'static/uploads'
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max file size
 app.config['ALLOWED_EXTENSIONS'] = {'png', 'jpg', 'jpeg', 'gif'}
+
+# Create upload folders if they don't exist
+os.makedirs(os.path.join(app.config['UPLOAD_FOLDER'], 'events'), exist_ok=True)
+os.makedirs(os.path.join(app.config['UPLOAD_FOLDER'], 'profile_pictures'), exist_ok=True)
 
 db = SQLAlchemy(app)
 login_manager = LoginManager()
@@ -154,6 +163,66 @@ class User(UserMixin, db.Model):
             return True
         return False
 
+    def get_recommendations(self, limit=5):
+        """Get personalized event recommendations based on user preferences and behavior"""
+        # Get user's past events and preferences
+        past_events = [event for event in self.events if event.date < datetime.utcnow()]
+        preferences = self.get_preferences()
+        
+        # Get all upcoming events
+        upcoming_events = Event.query.filter(Event.date > datetime.utcnow()).all()
+        
+        if not upcoming_events:
+            return []
+            
+        # Create feature vectors for events
+        event_features = []
+        for event in upcoming_events:
+            features = {
+                'title': event.title,
+                'description': event.description,
+                'category': event.category,
+                'tags': event.tags or '',
+                'venue': event.venue
+            }
+            event_features.append(' '.join(str(v) for v in features.values()))
+            
+        # Create TF-IDF vectors
+        vectorizer = TfidfVectorizer()
+        tfidf_matrix = vectorizer.fit_transform(event_features)
+        
+        # Calculate similarity scores
+        similarity_scores = []
+        for event in upcoming_events:
+            score = 0
+            
+            # Category preference
+            if preferences.get('preferred_categories') and event.category in preferences['preferred_categories']:
+                score += 2
+                
+            # Past event similarity
+            for past_event in past_events:
+                if event.category == past_event.category:
+                    score += 1
+                if event.venue == past_event.venue:
+                    score += 0.5
+                    
+            # Time preference
+            if preferences.get('preferred_time') and event.date.hour in preferences['preferred_time']:
+                score += 1
+                
+            # Price preference
+            if preferences.get('max_price') and event.price <= preferences['max_price']:
+                score += 1
+                
+            similarity_scores.append(score)
+            
+        # Sort events by similarity score
+        recommended_events = sorted(zip(upcoming_events, similarity_scores), 
+                                 key=lambda x: x[1], reverse=True)
+        
+        return [event for event, _ in recommended_events[:limit]]
+
 # Update Event model
 class Event(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -161,24 +230,42 @@ class Event(db.Model):
     description = db.Column(db.Text, nullable=False)
     date = db.Column(db.DateTime, nullable=False)
     venue = db.Column(db.String(200), nullable=False)
-    category = db.Column(db.String(50))
-    capacity = db.Column(db.Integer)
-    price = db.Column(db.Float, default=0.0)
-    organizer = db.Column(db.String(100))
-    contact_email = db.Column(db.String(120))
-    contact_phone = db.Column(db.String(20))
+    category = db.Column(db.String(50), nullable=False)
+    capacity = db.Column(db.Integer, nullable=False)
+    price = db.Column(db.Float, nullable=False)
+    organizer = db.Column(db.String(100), nullable=False)
+    contact_email = db.Column(db.String(120), nullable=False)
+    contact_phone = db.Column(db.String(20), nullable=False)
     requirements = db.Column(db.Text)
     schedule = db.Column(db.Text)
     speakers = db.Column(db.Text)
     sponsors = db.Column(db.Text)
-    image_url = db.Column(db.String(255))
+    image_url = db.Column(db.String(255))  # For external images
+    image_path = db.Column(db.String(255))  # For uploaded images
+    organizer_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    created_by = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    status = db.Column(db.String(20), default='upcoming')  # upcoming, ongoing, completed, cancelled
+    is_featured = db.Column(db.Boolean, default=False)
+    registration_deadline = db.Column(db.DateTime)
+    tags = db.Column(db.String(255))  # Comma-separated tags
+    additional_images = db.Column(db.Text)  # JSON string for multiple images
     likes = db.Column(db.Integer, default=0)
     shares = db.Column(db.Integer, default=0)
     views = db.Column(db.Integer, default=0)
     revenue = db.Column(db.Float, default=0.0)
     chat_messages = db.relationship('ChatMessage', backref='event', lazy=True)
-    organizer_id = db.Column(db.Integer, db.ForeignKey('user.id'))
-    created_by = db.Column(db.Integer, db.ForeignKey('user.id'))
+
+    def get_image_url(self):
+        if self.image_path:
+            return url_for('uploaded_file', filename=f'events/{os.path.basename(self.image_path)}')
+        return self.image_url or url_for('static', filename='images/default-event.jpg')
+
+    def get_additional_images(self):
+        if self.additional_images:
+            return json.loads(self.additional_images)
+        return []
 
     def increment_likes(self):
         self.likes += 1
@@ -191,6 +278,43 @@ class Event(db.Model):
     def increment_views(self):
         self.views += 1
         db.session.commit()
+
+    def get_similar_events(self, limit=3):
+        """Get similar events based on content similarity"""
+        # Get all upcoming events
+        upcoming_events = Event.query.filter(
+            Event.date > datetime.utcnow(),
+            Event.id != self.id
+        ).all()
+        
+        if not upcoming_events:
+            return []
+            
+        # Create feature vectors
+        events = [self] + upcoming_events
+        event_features = []
+        for event in events:
+            features = {
+                'title': event.title,
+                'description': event.description,
+                'category': event.category,
+                'tags': event.tags or '',
+                'venue': event.venue
+            }
+            event_features.append(' '.join(str(v) for v in features.values()))
+            
+        # Create TF-IDF vectors
+        vectorizer = TfidfVectorizer()
+        tfidf_matrix = vectorizer.fit_transform(event_features)
+        
+        # Calculate similarity scores
+        similarity_scores = cosine_similarity(tfidf_matrix[0:1], tfidf_matrix[1:])[0]
+        
+        # Sort events by similarity score
+        similar_events = sorted(zip(upcoming_events, similarity_scores), 
+                              key=lambda x: x[1], reverse=True)
+        
+        return [event for event, _ in similar_events[:limit]]
 
 # Association table for user-events relationship
 user_events = db.Table('user_events',
@@ -454,7 +578,7 @@ def edit_profile():
     )
 
 def allowed_file(filename):
-    return '.' in filename and filename.rsplit('.', 1)[1].lower() in {'png', 'jpg', 'jpeg', 'gif'}
+    return '.' in filename and filename.rsplit('.', 1)[1].lower() in app.config['ALLOWED_EXTENSIONS']
 
 def init_db():
     with app.app_context():
@@ -814,6 +938,28 @@ def achievements():
 def leaderboard():
     top_users = User.query.join(UserPoints).order_by(UserPoints.points.desc()).limit(10).all()
     return render_template('leaderboard.html', top_users=top_users)
+
+# Add route to serve uploaded files
+@app.route('/uploads/<path:filename>')
+def uploaded_file(filename):
+    return send_from_directory(app.config['UPLOAD_FOLDER'], filename)
+
+@app.route('/recommendations')
+@login_required
+def recommendations():
+    """Get personalized event recommendations"""
+    recommended_events = current_user.get_recommendations()
+    return render_template('recommendations.html', 
+                         recommended_events=recommended_events)
+
+@app.route('/event/<int:event_id>/similar')
+def similar_events(event_id):
+    """Get similar events for a specific event"""
+    event = Event.query.get_or_404(event_id)
+    similar_events = event.get_similar_events()
+    return render_template('similar_events.html', 
+                         event=event,
+                         similar_events=similar_events)
 
 if __name__ == '__main__':
     init_db()

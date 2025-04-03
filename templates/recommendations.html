@@ -1,0 +1,153 @@
+{% extends "base.html" %}
+
+{% block title %}Recommended Events{% endblock %}
+
+{% block content %}
+<div class="recommendations-container">
+    <h1>Recommended Events for You</h1>
+    <p class="subtitle">Based on your preferences and past events</p>
+    
+    {% if recommended_events %}
+    <div class="recommendations-grid">
+        {% for event in recommended_events %}
+        <div class="recommendation-card">
+            <div class="event-image">
+                <img src="{{ event.get_image_url() }}" alt="{{ event.title }}">
+            </div>
+            <div class="event-info">
+                <h2>{{ event.title }}</h2>
+                <div class="event-meta">
+                    <span class="category">{{ event.category }}</span>
+                    <span class="date">{{ event.date.strftime('%B %d, %Y at %I:%M %p') }}</span>
+                    <span class="venue">{{ event.venue }}</span>
+                </div>
+                <p class="description">{{ event.description[:200] }}...</p>
+                <div class="event-actions">
+                    <a href="{{ url_for('event_details', event_id=event.id) }}" class="btn">View Details</a>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="no-recommendations">
+        <p>We don't have enough data to provide personalized recommendations yet.</p>
+        <p>Try attending some events or updating your preferences to get better recommendations!</p>
+        <a href="{{ url_for('edit_profile') }}" class="btn">Update Preferences</a>
+    </div>
+    {% endif %}
+</div>
+
+<style>
+    .recommendations-container {
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 40px 20px;
+    }
+
+    .recommendations-container h1 {
+        font-size: 2.5rem;
+        color: var(--heading-color);
+        margin-bottom: 10px;
+    }
+
+    .subtitle {
+        color: var(--text-color);
+        font-size: 1.1rem;
+        margin-bottom: 30px;
+    }
+
+    .recommendations-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+        gap: 30px;
+    }
+
+    .recommendation-card {
+        background: var(--card-bg);
+        border-radius: 12px;
+        overflow: hidden;
+        box-shadow: 0 4px 15px var(--shadow-color);
+        transition: transform 0.3s ease;
+    }
+
+    .recommendation-card:hover {
+        transform: translateY(-5px);
+    }
+
+    .event-image {
+        height: 200px;
+        overflow: hidden;
+    }
+
+    .event-image img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+    }
+
+    .event-info {
+        padding: 20px;
+    }
+
+    .event-info h2 {
+        font-size: 1.5rem;
+        color: var(--heading-color);
+        margin-bottom: 15px;
+    }
+
+    .event-meta {
+        display: flex;
+        gap: 10px;
+        margin-bottom: 15px;
+        flex-wrap: wrap;
+    }
+
+    .event-meta span {
+        padding: 5px 12px;
+        background: rgba(52, 152, 219, 0.1);
+        border-radius: 20px;
+        color: #3498db;
+        font-size: 0.9rem;
+    }
+
+    .description {
+        color: var(--text-color);
+        line-height: 1.6;
+        margin-bottom: 20px;
+    }
+
+    .event-actions {
+        display: flex;
+        justify-content: flex-end;
+    }
+
+    .no-recommendations {
+        text-align: center;
+        padding: 40px;
+        background: var(--card-bg);
+        border-radius: 12px;
+        box-shadow: 0 4px 15px var(--shadow-color);
+    }
+
+    .no-recommendations p {
+        color: var(--text-color);
+        margin-bottom: 20px;
+        font-size: 1.1rem;
+    }
+
+    @media (max-width: 768px) {
+        .recommendations-container {
+            padding: 20px;
+        }
+
+        .recommendations-container h1 {
+            font-size: 2rem;
+        }
+
+        .recommendations-grid {
+            grid-template-columns: 1fr;
+        }
+    }
+</style>
+{% endblock %} 

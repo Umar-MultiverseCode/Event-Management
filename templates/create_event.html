@@ -1,0 +1,223 @@
+{% extends "base.html" %}
+
+{% block title %}Create Event{% endblock %}
+
+{% block content %}
+<div class="form-container">
+    <h2>Create New Event</h2>
+    <form method="POST" enctype="multipart/form-data">
+        <div class="form-group">
+            <label for="title">Event Title</label>
+            <input type="text" id="title" name="title" required>
+        </div>
+
+        <div class="form-group">
+            <label for="description">Description</label>
+            <textarea id="description" name="description" rows="4" required></textarea>
+        </div>
+
+        <div class="form-group">
+            <label for="date">Event Date and Time</label>
+            <input type="datetime-local" id="date" name="date" required>
+        </div>
+
+        <div class="form-group">
+            <label for="venue">Venue</label>
+            <input type="text" id="venue" name="venue" required>
+        </div>
+
+        <div class="form-group">
+            <label for="category">Category</label>
+            <select id="category" name="category" required>
+                <option value="Technology">Technology</option>
+                <option value="Business">Business</option>
+                <option value="Education">Education</option>
+                <option value="Entertainment">Entertainment</option>
+                <option value="Sports">Sports</option>
+                <option value="Other">Other</option>
+            </select>
+        </div>
+
+        <div class="form-group">
+            <label for="capacity">Capacity</label>
+            <input type="number" id="capacity" name="capacity" min="1" required>
+        </div>
+
+        <div class="form-group">
+            <label for="price">Price (₹)</label>
+            <input type="number" id="price" name="price" min="0" step="0.01" required>
+        </div>
+
+        <div class="form-group">
+            <label for="organizer">Organizer Name</label>
+            <input type="text" id="organizer" name="organizer" required>
+        </div>
+
+        <div class="form-group">
+            <label for="contact_email">Contact Email</label>
+            <input type="email" id="contact_email" name="contact_email" required>
+        </div>
+
+        <div class="form-group">
+            <label for="contact_phone">Contact Phone</label>
+            <input type="tel" id="contact_phone" name="contact_phone" required>
+        </div>
+
+        <div class="form-group">
+            <label for="requirements">Requirements</label>
+            <textarea id="requirements" name="requirements" rows="2"></textarea>
+        </div>
+
+        <div class="form-group">
+            <label for="schedule">Schedule</label>
+            <textarea id="schedule" name="schedule" rows="3"></textarea>
+        </div>
+
+        <div class="form-group">
+            <label for="speakers">Speakers</label>
+            <textarea id="speakers" name="speakers" rows="2"></textarea>
+        </div>
+
+        <div class="form-group">
+            <label for="sponsors">Sponsors</label>
+            <textarea id="sponsors" name="sponsors" rows="2"></textarea>
+        </div>
+
+        <div class="form-group">
+            <label for="image">Main Event Image</label>
+            <input type="file" id="image" name="image" accept="image/*">
+            <small>Upload a high-quality image for your event (max 16MB)</small>
+        </div>
+
+        <div class="form-group">
+            <label for="additional_images">Additional Images</label>
+            <input type="file" id="additional_images" name="additional_images" accept="image/*" multiple>
+            <small>You can select multiple images (max 16MB each)</small>
+        </div>
+
+        <div class="form-group">
+            <label for="image_url">Or External Image URL</label>
+            <input type="url" id="image_url" name="image_url" placeholder="https://example.com/image.jpg">
+        </div>
+
+        <div class="form-group">
+            <label for="tags">Tags (comma-separated)</label>
+            <input type="text" id="tags" name="tags" placeholder="tech, conference, networking">
+        </div>
+
+        <div class="form-group">
+            <label for="registration_deadline">Registration Deadline</label>
+            <input type="datetime-local" id="registration_deadline" name="registration_deadline">
+        </div>
+
+        <div class="form-group">
+            <label>
+                <input type="checkbox" name="is_featured" id="is_featured">
+                Feature this event
+            </label>
+        </div>
+
+        <button type="submit" class="btn">Create Event</button>
+    </form>
+</div>
+
+<style>
+    .form-container {
+        max-width: 800px;
+        margin: 40px auto;
+        padding: 30px;
+        background: var(--card-bg);
+        border-radius: 12px;
+        box-shadow: 0 4px 6px var(--shadow-color);
+    }
+
+    .form-container h2 {
+        text-align: center;
+        color: var(--heading-color);
+        margin-bottom: 30px;
+        font-size: 2rem;
+    }
+
+    .form-group {
+        margin-bottom: 20px;
+    }
+
+    .form-group label {
+        display: block;
+        margin-bottom: 8px;
+        color: var(--text-color);
+        font-weight: 500;
+    }
+
+    .form-group input[type="text"],
+    .form-group input[type="email"],
+    .form-group input[type="tel"],
+    .form-group input[type="number"],
+    .form-group input[type="url"],
+    .form-group input[type="datetime-local"],
+    .form-group select,
+    .form-group textarea {
+        width: 100%;
+        padding: 12px;
+        border: 2px solid var(--border-color);
+        border-radius: 8px;
+        background: var(--input-bg);
+        color: var(--text-color);
+        font-size: 1rem;
+        transition: all 0.3s ease;
+    }
+
+    .form-group input:focus,
+    .form-group select:focus,
+    .form-group textarea:focus {
+        border-color: #3498db;
+        box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.2);
+        outline: none;
+    }
+
+    .form-group small {
+        display: block;
+        margin-top: 5px;
+        color: var(--secondary-text);
+        font-size: 0.85rem;
+    }
+
+    .form-group input[type="file"] {
+        width: 100%;
+        padding: 10px;
+        border: 2px dashed var(--border-color);
+        border-radius: 8px;
+        background: var(--input-bg);
+        color: var(--text-color);
+    }
+
+    .form-group input[type="checkbox"] {
+        margin-right: 10px;
+    }
+
+    button[type="submit"] {
+        width: 100%;
+        padding: 15px;
+        background: linear-gradient(135deg, #2c3e50, #3498db);
+        color: white;
+        border: none;
+        border-radius: 8px;
+        font-size: 1.1rem;
+        font-weight: 500;
+        cursor: pointer;
+        transition: all 0.3s ease;
+    }
+
+    button[type="submit"]:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 10px var(--shadow-color);
+    }
+
+    @media (max-width: 768px) {
+        .form-container {
+            padding: 20px;
+            margin: 20px;
+        }
+    }
+</style>
+{% endblock %} 
