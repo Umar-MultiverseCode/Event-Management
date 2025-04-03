@@ -1,0 +1,183 @@
+{% extends "base.html" %}
+
+{% block title %}Notifications{% endblock %}
+
+{% block content %}
+<div class="notifications-container">
+    <div class="notifications-header">
+        <h1>Notifications</h1>
+        <button id="mark-all-read" class="btn">Mark All as Read</button>
+    </div>
+
+    <div class="notifications-list">
+        {% for notification in notifications %}
+        <div class="notification-card {% if not notification.is_read %}unread{% endif %}" data-id="{{ notification.id }}">
+            <div class="notification-content">
+                <div class="notification-message">{{ notification.message }}</div>
+                <div class="notification-meta">
+                    <span class="notification-time">{{ notification.created_at.strftime('%B %d, %Y at %I:%M %p') }}</span>
+                    {% if not notification.is_read %}
+                    <span class="notification-status">New</span>
+                    {% endif %}
+                </div>
+            </div>
+            {% if notification.type == 'event_update' %}
+            <div class="notification-actions">
+                <a href="{{ url_for('event_details', event_id=notification.data|from_json|attr('event_id')) }}" class="btn">View Event</a>
+            </div>
+            {% endif %}
+        </div>
+        {% else %}
+        <div class="no-notifications">
+            <i class="fas fa-bell-slash"></i>
+            <p>No notifications yet</p>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+
+<style>
+    .notifications-container {
+        max-width: 800px;
+        margin: 40px auto;
+        padding: 20px;
+    }
+
+    .notifications-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 30px;
+    }
+
+    .notifications-header h1 {
+        color: var(--heading-color);
+        font-size: 2rem;
+    }
+
+    .notifications-list {
+        display: flex;
+        flex-direction: column;
+        gap: 15px;
+    }
+
+    .notification-card {
+        background: var(--card-bg);
+        border-radius: 12px;
+        padding: 20px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        box-shadow: 0 2px 10px var(--shadow-color);
+        transition: all 0.3s ease;
+    }
+
+    .notification-card.unread {
+        border-left: 4px solid #4a90e2;
+    }
+
+    .notification-content {
+        flex: 1;
+    }
+
+    .notification-message {
+        color: var(--text-color);
+        font-size: 1.1rem;
+        margin-bottom: 10px;
+    }
+
+    .notification-meta {
+        display: flex;
+        gap: 15px;
+        color: var(--secondary-text);
+        font-size: 0.9rem;
+    }
+
+    .notification-status {
+        color: #4a90e2;
+        font-weight: 500;
+    }
+
+    .notification-actions {
+        margin-left: 20px;
+    }
+
+    .no-notifications {
+        text-align: center;
+        padding: 40px;
+        background: var(--card-bg);
+        border-radius: 12px;
+        color: var(--secondary-text);
+    }
+
+    .no-notifications i {
+        font-size: 3rem;
+        margin-bottom: 20px;
+        color: var(--secondary-text);
+    }
+
+    @media (max-width: 768px) {
+        .notification-card {
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        .notification-actions {
+            margin-left: 0;
+            width: 100%;
+        }
+
+        .notification-actions .btn {
+            width: 100%;
+            text-align: center;
+        }
+    }
+</style>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Mark all notifications as read
+    document.getElementById('mark-all-read').addEventListener('click', function() {
+        fetch('/notifications/read_all', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                document.querySelectorAll('.notification-card.unread').forEach(card => {
+                    card.classList.remove('unread');
+                    const status = card.querySelector('.notification-status');
+                    if (status) status.remove();
+                });
+            }
+        });
+    });
+
+    // Mark individual notification as read
+    document.querySelectorAll('.notification-card').forEach(card => {
+        card.addEventListener('click', function() {
+            if (this.classList.contains('unread')) {
+                const notificationId = this.dataset.id;
+                fetch(`/notifications/read/${notificationId}`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        this.classList.remove('unread');
+                        const status = this.querySelector('.notification-status');
+                        if (status) status.remove();
+                    }
+                });
+            }
+        });
+    });
+});
+</script>
+{% endblock %} 

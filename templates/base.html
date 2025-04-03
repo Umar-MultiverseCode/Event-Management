@@ -14,6 +14,8 @@
             --border-color: #e9ecef;
             --input-bg: white;
             --shadow-color: rgba(0, 0, 0, 0.1);
+            --secondary-text: #6c757d;
+            --heading-color: #2c3e50;
         }
 
         [data-theme="dark"] {
@@ -24,6 +26,8 @@
             --border-color: #404040;
             --input-bg: #333333;
             --shadow-color: rgba(0, 0, 0, 0.3);
+            --secondary-text: #a0a0a0;
+            --heading-color: #ffffff;
         }
 
         * {
@@ -208,16 +212,16 @@
         }
         .event-card h3 {
             margin-bottom: 15px;
-            color: #2c3e50;
+            color: var(--heading-color);
             font-size: 1.4rem;
             font-weight: 600;
         }
         .event-card p {
             margin-bottom: 10px;
-            color: #6c757d;
+            color: var(--secondary-text);
         }
         .event-card strong {
-            color: #2c3e50;
+            color: var(--heading-color);
         }
         .event-actions {
             margin-top: 20px;
@@ -346,6 +350,33 @@
         .theme-toggle i {
             font-size: 1.2rem;
         }
+
+        .notification-link {
+            position: relative;
+        }
+
+        .notification-badge {
+            position: absolute;
+            top: -8px;
+            right: -8px;
+            background: #dc3545;
+            color: white;
+            border-radius: 50%;
+            padding: 2px 6px;
+            font-size: 0.8rem;
+            min-width: 20px;
+            text-align: center;
+        }
+
+        @media (max-width: 768px) {
+            .notification-badge {
+                top: -5px;
+                right: -5px;
+                padding: 1px 4px;
+                font-size: 0.7rem;
+                min-width: 16px;
+            }
+        }
     </style>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
 </head>
@@ -359,6 +390,12 @@
                     <a href="{{ url_for('upcoming_events') }}">Upcoming Events</a>
                     <a href="{{ url_for('joined_events') }}">Joined Events</a>
                     <a href="{{ url_for('profile') }}">Profile</a>
+                    <a href="{{ url_for('notifications') }}" class="notification-link">
+                        Notifications
+                        {% if current_user.notifications|selectattr('is_read', 'equalto', False)|list|length > 0 %}
+                        <span class="notification-badge">{{ current_user.notifications|selectattr('is_read', 'equalto', False)|list|length }}</span>
+                        {% endif %}
+                    </a>
                     <a href="{{ url_for('logout') }}">Logout</a>
                 {% else %}
                     <a href="{{ url_for('login') }}">Login</a>
@@ -406,6 +443,34 @@
             const icon = document.querySelector('.theme-toggle i');
             icon.className = theme === 'dark' ? 'fas fa-sun' : 'fas fa-moon';
         }
+
+        // Check for new notifications periodically
+        function checkNotifications() {
+            if (document.querySelector('.notification-link')) {
+                fetch('/notifications/count')
+                    .then(response => response.json())
+                    .then(data => {
+                        const badge = document.querySelector('.notification-badge');
+                        if (data.count > 0) {
+                            if (!badge) {
+                                const link = document.querySelector('.notification-link');
+                                const newBadge = document.createElement('span');
+                                newBadge.className = 'notification-badge';
+                                newBadge.textContent = data.count;
+                                link.appendChild(newBadge);
+                            } else {
+                                badge.textContent = data.count;
+                            }
+                        } else if (badge) {
+                            badge.remove();
+                        }
+                    });
+            }
+        }
+
+        // Check notifications every 30 seconds
+        setInterval(checkNotifications, 30000);
+        checkNotifications(); // Initial check
     </script>
 </body>
 </html> 

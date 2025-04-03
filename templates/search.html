@@ -1,0 +1,312 @@
+{% extends "base.html" %}
+
+{% block title %}Search Events{% endblock %}
+
+{% block content %}
+<div class="search-container">
+    <h1>Search Events</h1>
+    
+    <div class="search-filters">
+        <form method="GET" class="search-form">
+            <div class="form-group">
+                <input type="text" name="query" placeholder="Search events..." value="{{ request.args.get('query', '') }}" class="search-input">
+            </div>
+            
+            <div class="filter-group">
+                <div class="form-group">
+                    <label for="category">Category</label>
+                    <select name="category" id="category" class="filter-select">
+                        <option value="">All Categories</option>
+                        {% for category in categories %}
+                        <option value="{{ category }}" {% if request.args.get('category') == category %}selected{% endif %}>
+                            {{ category }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label for="date">Date Range</label>
+                    <select name="date" id="date" class="filter-select">
+                        <option value="">Any Time</option>
+                        <option value="today" {% if request.args.get('date') == 'today' %}selected{% endif %}>Today</option>
+                        <option value="week" {% if request.args.get('date') == 'week' %}selected{% endif %}>This Week</option>
+                        <option value="month" {% if request.args.get('date') == 'month' %}selected{% endif %}>This Month</option>
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label for="price">Price Range</label>
+                    <select name="price" id="price" class="filter-select">
+                        <option value="">Any Price</option>
+                        <option value="free" {% if request.args.get('price') == 'free' %}selected{% endif %}>Free</option>
+                        <option value="paid" {% if request.args.get('price') == 'paid' %}selected{% endif %}>Paid</option>
+                    </select>
+                </div>
+            </div>
+            
+            <button type="submit" class="search-button">Search</button>
+        </form>
+    </div>
+    
+    <div class="search-results">
+        {% if events %}
+            <div class="results-count">
+                Found {{ events|length }} events
+            </div>
+            
+            <div class="events-grid">
+                {% for event in events %}
+                <div class="event-card">
+                    {% if event.image_url %}
+                    <div class="event-image">
+                        <img src="{{ event.image_url }}" alt="{{ event.title }}">
+                    </div>
+                    {% endif %}
+                    
+                    <div class="event-content">
+                        <h3>{{ event.title }}</h3>
+                        <div class="event-meta">
+                            <span class="date">
+                                <i class="fas fa-calendar"></i>
+                                {{ event.date.strftime('%B %d, %Y') }}
+                            </span>
+                            <span class="venue">
+                                <i class="fas fa-map-marker-alt"></i>
+                                {{ event.venue }}
+                            </span>
+                        </div>
+                        <p class="description">{{ event.description[:150] }}...</p>
+                        <div class="event-footer">
+                            <span class="category">{{ event.category }}</span>
+                            <span class="price">
+                                {% if event.price == 0 %}
+                                    Free
+                                {% else %}
+                                    ${{ "%.2f"|format(event.price) }}
+                                {% endif %}
+                            </span>
+                        </div>
+                        <a href="{{ url_for('event_details', event_id=event.id) }}" class="view-details">View Details</a>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        {% else %}
+            <div class="no-results">
+                <i class="fas fa-search"></i>
+                <p>No events found matching your criteria.</p>
+                <a href="{{ url_for('search_events') }}" class="clear-filters">Clear Filters</a>
+            </div>
+        {% endif %}
+    </div>
+</div>
+
+<style>
+    .search-container {
+        max-width: 1200px;
+        margin: 40px auto;
+        padding: 20px;
+    }
+
+    .search-filters {
+        background: var(--card-bg);
+        padding: 30px;
+        border-radius: 12px;
+        margin-bottom: 30px;
+        box-shadow: 0 4px 15px var(--shadow-color);
+    }
+
+    .search-form {
+        display: flex;
+        flex-direction: column;
+        gap: 20px;
+    }
+
+    .form-group {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+    }
+
+    .search-input {
+        padding: 15px;
+        border: 2px solid var(--input-bg);
+        border-radius: 8px;
+        font-size: 1.1rem;
+        background: var(--input-bg);
+        color: var(--text-color);
+    }
+
+    .filter-group {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 20px;
+    }
+
+    .filter-select {
+        padding: 12px;
+        border: 2px solid var(--input-bg);
+        border-radius: 8px;
+        background: var(--input-bg);
+        color: var(--text-color);
+    }
+
+    .search-button {
+        padding: 12px 24px;
+        background: #4a90e2;
+        color: white;
+        border: none;
+        border-radius: 8px;
+        cursor: pointer;
+        font-size: 1.1rem;
+        transition: background-color 0.3s ease;
+    }
+
+    .search-button:hover {
+        background: #357abd;
+    }
+
+    .results-count {
+        margin-bottom: 20px;
+        color: var(--text-color);
+        font-size: 1.1rem;
+    }
+
+    .events-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+        gap: 30px;
+    }
+
+    .event-card {
+        background: var(--card-bg);
+        border-radius: 12px;
+        overflow: hidden;
+        box-shadow: 0 4px 15px var(--shadow-color);
+        transition: transform 0.3s ease;
+    }
+
+    .event-card:hover {
+        transform: translateY(-5px);
+    }
+
+    .event-image {
+        height: 200px;
+        overflow: hidden;
+    }
+
+    .event-image img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+    }
+
+    .event-content {
+        padding: 20px;
+    }
+
+    .event-content h3 {
+        margin: 0 0 15px 0;
+        color: var(--text-color);
+    }
+
+    .event-meta {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        margin-bottom: 15px;
+        color: #666;
+    }
+
+    .event-meta span {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .event-meta i {
+        color: #4a90e2;
+    }
+
+    .description {
+        color: var(--text-color);
+        margin-bottom: 15px;
+        line-height: 1.6;
+    }
+
+    .event-footer {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 15px;
+    }
+
+    .category {
+        background: #4a90e2;
+        color: white;
+        padding: 5px 10px;
+        border-radius: 15px;
+        font-size: 0.9rem;
+    }
+
+    .price {
+        font-weight: bold;
+        color: var(--text-color);
+    }
+
+    .view-details {
+        display: block;
+        text-align: center;
+        padding: 10px;
+        background: #4a90e2;
+        color: white;
+        text-decoration: none;
+        border-radius: 8px;
+        transition: background-color 0.3s ease;
+    }
+
+    .view-details:hover {
+        background: #357abd;
+    }
+
+    .no-results {
+        text-align: center;
+        padding: 40px;
+        background: var(--card-bg);
+        border-radius: 12px;
+        box-shadow: 0 4px 15px var(--shadow-color);
+    }
+
+    .no-results i {
+        font-size: 3rem;
+        color: #4a90e2;
+        margin-bottom: 20px;
+    }
+
+    .no-results p {
+        color: var(--text-color);
+        margin-bottom: 20px;
+    }
+
+    .clear-filters {
+        color: #4a90e2;
+        text-decoration: none;
+        font-weight: bold;
+    }
+
+    .clear-filters:hover {
+        text-decoration: underline;
+    }
+
+    @media (max-width: 768px) {
+        .filter-group {
+            grid-template-columns: 1fr;
+        }
+
+        .events-grid {
+            grid-template-columns: 1fr;
+        }
+    }
+</style>
+{% endblock %} 

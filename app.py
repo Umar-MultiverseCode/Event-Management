@@ -1,69 +1,243 @@
-from flask import Flask, render_template, request, redirect, url_for, flash
+from flask import Flask, render_template, request, redirect, url_for, flash, jsonify
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager, UserMixin, login_user, login_required, logout_user, current_user
 from werkzeug.security import generate_password_hash, check_password_hash
 from datetime import datetime, timedelta
 import random
+from flask_socketio import SocketIO, emit, join_room, leave_room
 import os
 from werkzeug.utils import secure_filename
+import json
 
 app = Flask(__name__)
-app.config['SECRET_KEY'] = 'your-secret-key-here'
+app.config['SECRET_KEY'] = 'your-secret-key'
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///events.db'
 app.config['UPLOAD_FOLDER'] = 'static/profile_pictures'
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max file size
+app.config['ALLOWED_EXTENSIONS'] = {'png', 'jpg', 'jpeg', 'gif'}
+
 db = SQLAlchemy(app)
 login_manager = LoginManager()
 login_manager.init_app(app)
 login_manager.login_view = 'login'
+socketio = SocketIO(app)
 
-# Database Models
+# Notification model
+class Notification(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    message = db.Column(db.String(500), nullable=False)
+    is_read = db.Column(db.Boolean, default=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    type = db.Column(db.String(50))  # 'event_update', 'message', 'system'
+    data = db.Column(db.Text)  # JSON string for additional data
+
+# Chat message model
+class ChatMessage(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    event_id = db.Column(db.Integer, db.ForeignKey('event.id'), nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    message = db.Column(db.Text, nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    user = db.relationship('User', backref='chat_messages')
+
+# Event Comment model
+class EventComment(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    event_id = db.Column(db.Integer, db.ForeignKey('event.id'), nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    content = db.Column(db.Text, nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    parent_id = db.Column(db.Integer, db.ForeignKey('event_comment.id'))
+    user = db.relationship('User', backref='comments')
+    event = db.relationship('Event', backref='comments')
+
+# Event Rating model
+class EventRating(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    event_id = db.Column(db.Integer, db.ForeignKey('event.id'), nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    rating = db.Column(db.Integer, nullable=False)
+    review = db.Column(db.Text)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    user = db.relationship('User', backref='ratings')
+    event = db.relationship('Event', backref='ratings')
+
+# Update User model
 class User(UserMixin, db.Model):
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(80), unique=True, nullable=False)
-    password = db.Column(db.String(120), nullable=False)
     email = db.Column(db.String(120), unique=True, nullable=False)
-    profile_picture = db.Column(db.String(200), default='default.jpg')
-    bio = db.Column(db.Text, default='')
-    joined_events = db.relationship('Event', secondary='user_events', backref=db.backref('attendees', lazy='dynamic'))
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    last_login = db.Column(db.DateTime)
-    preferences = db.Column(db.JSON, default=lambda: {
-        'notifications': True,
-        'email_updates': True,
-        'theme': 'light'
-    })
+    password_hash = db.Column(db.String(128))
+    profile_picture = db.Column(db.String(255))
+    bio = db.Column(db.Text)
+    notifications = db.relationship('Notification', backref='user', lazy=True)
+    last_seen = db.Column(db.DateTime, default=datetime.utcnow)
+    events = db.relationship('Event', secondary='user_events', backref=db.backref('attendees', lazy='dynamic'))
+    preferences = db.Column(db.Text)  # JSON string for user preferences
 
     def set_password(self, password):
-        self.password = generate_password_hash(password)
+        self.password_hash = generate_password_hash(password)
 
     def check_password(self, password):
-        return check_password_hash(self.password, password)
+        return check_password_hash(self.password_hash, password)
 
-# Association table for User-Event many-to-many relationship
-user_events = db.Table('user_events',
-    db.Column('user_id', db.Integer, db.ForeignKey('user.id'), primary_key=True),
-    db.Column('event_id', db.Integer, db.ForeignKey('event.id'), primary_key=True)
-)
+    def get_preferences(self):
+        if self.preferences:
+            return json.loads(self.preferences)
+        return {}
 
+    def set_preferences(self, preferences):
+        self.preferences = json.dumps(preferences)
+
+# Update Event model
 class Event(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     title = db.Column(db.String(100), nullable=False)
     description = db.Column(db.Text, nullable=False)
     date = db.Column(db.DateTime, nullable=False)
     venue = db.Column(db.String(200), nullable=False)
-    created_by = db.Column(db.Integer, db.ForeignKey('user.id'))
-    category = db.Column(db.String(50), nullable=False)
-    capacity = db.Column(db.Integer, nullable=False)
-    price = db.Column(db.Float, nullable=False)
-    organizer = db.Column(db.String(100), nullable=False)
-    contact_email = db.Column(db.String(120), nullable=False)
-    contact_phone = db.Column(db.String(20), nullable=False)
+    category = db.Column(db.String(50))
+    capacity = db.Column(db.Integer)
+    price = db.Column(db.Float, default=0.0)
+    organizer = db.Column(db.String(100))
+    contact_email = db.Column(db.String(120))
+    contact_phone = db.Column(db.String(20))
     requirements = db.Column(db.Text)
     schedule = db.Column(db.Text)
     speakers = db.Column(db.Text)
     sponsors = db.Column(db.Text)
-    image_url = db.Column(db.String(200))
+    image_url = db.Column(db.String(255))
+    likes = db.Column(db.Integer, default=0)
+    shares = db.Column(db.Integer, default=0)
+    views = db.Column(db.Integer, default=0)
+    revenue = db.Column(db.Float, default=0.0)
+    chat_messages = db.relationship('ChatMessage', backref='event', lazy=True)
+    organizer_id = db.Column(db.Integer, db.ForeignKey('user.id'))
+    created_by = db.Column(db.Integer, db.ForeignKey('user.id'))
+
+    def increment_likes(self):
+        self.likes += 1
+        db.session.commit()
+
+    def increment_shares(self):
+        self.shares += 1
+        db.session.commit()
+
+    def increment_views(self):
+        self.views += 1
+        db.session.commit()
+
+# Association table for user-events relationship
+user_events = db.Table('user_events',
+    db.Column('user_id', db.Integer, db.ForeignKey('user.id'), primary_key=True),
+    db.Column('event_id', db.Integer, db.ForeignKey('event.id'), primary_key=True)
+)
+
+# WebSocket event handlers
+@socketio.on('join')
+def on_join(data):
+    room = data['room']
+    join_room(room)
+    emit('status', {'msg': f'{current_user.username} has joined the room.'}, room=room)
+
+@socketio.on('leave')
+def on_leave(data):
+    room = data['room']
+    leave_room(room)
+    emit('status', {'msg': f'{current_user.username} has left the room.'}, room=room)
+
+@socketio.on('chat_message')
+def handle_chat_message(data):
+    room = data['room']
+    message = data['message']
+    
+    # Save message to database
+    chat_message = ChatMessage(
+        event_id=room,
+        user_id=current_user.id,
+        message=message
+    )
+    db.session.add(chat_message)
+    db.session.commit()
+    
+    # Emit message to room
+    emit('chat_message', {
+        'user': current_user.username,
+        'message': message,
+        'timestamp': datetime.utcnow().strftime('%H:%M')
+    }, room=room)
+
+@socketio.on('typing')
+def handle_typing(data):
+    room = data['room']
+    emit('typing', {
+        'user': current_user.username
+    }, room=room, include_self=False)
+
+# Notification routes
+@app.route('/notifications')
+@login_required
+def notifications():
+    user_notifications = Notification.query.filter_by(user_id=current_user.id).order_by(Notification.created_at.desc()).all()
+    return render_template('notifications.html', notifications=user_notifications)
+
+@app.route('/notifications/count')
+@login_required
+def notification_count():
+    count = Notification.query.filter_by(user_id=current_user.id, is_read=False).count()
+    return jsonify({'count': count})
+
+@app.route('/notifications/read/<int:notification_id>', methods=['POST'])
+@login_required
+def mark_notification_read(notification_id):
+    notification = Notification.query.get_or_404(notification_id)
+    if notification.user_id != current_user.id:
+        return jsonify({'error': 'Unauthorized'}), 403
+    
+    notification.is_read = True
+    db.session.commit()
+    return jsonify({'success': True})
+
+@app.route('/notifications/read_all', methods=['POST'])
+@login_required
+def mark_all_notifications_read():
+    Notification.query.filter_by(user_id=current_user.id, is_read=False).update({'is_read': True})
+    db.session.commit()
+    return jsonify({'success': True})
+
+# Update existing routes to include notifications
+@app.route('/join_event/<int:event_id>', methods=['POST'])
+@login_required
+def join_event(event_id):
+    event = Event.query.get_or_404(event_id)
+    if event not in current_user.events:
+        current_user.events.append(event)
+        
+        # Create notification for event organizer
+        notification = Notification(
+            user_id=event.organizer_id,  # Assuming organizer_id is added to Event model
+            message=f'{current_user.username} has joined your event: {event.title}',
+            type='event_update',
+            data=json.dumps({'event_id': event.id})
+        )
+        db.session.add(notification)
+        
+        db.session.commit()
+        flash('You have successfully joined the event!', 'success')
+    return redirect(url_for('event_details', event_id=event_id))
+
+# Add new route for event chat
+@app.route('/event/<int:event_id>/chat')
+@login_required
+def event_chat(event_id):
+    event = Event.query.get_or_404(event_id)
+    if event not in current_user.events:
+        flash('You must join the event to access the chat.', 'error')
+        return redirect(url_for('event_details', event_id=event_id))
+    
+    messages = ChatMessage.query.filter_by(event_id=event_id).order_by(ChatMessage.created_at.asc()).all()
+    return render_template('event_chat.html', event=event, messages=messages)
 
 @login_manager.user_loader
 def load_user(user_id):
@@ -124,32 +298,22 @@ def upcoming_events():
 @app.route('/joined_events')
 @login_required
 def joined_events():
-    joined_events = current_user.joined_events
+    joined_events = current_user.events
     return render_template('joined_events.html', events=joined_events)
 
 @app.route('/event/<int:event_id>')
 @login_required
 def event_details(event_id):
     event = Event.query.get_or_404(event_id)
-    is_joined = event in current_user.joined_events
+    is_joined = event in current_user.events
     return render_template('event_details.html', event=event, is_joined=is_joined)
-
-@app.route('/join_event/<int:event_id>', methods=['POST'])
-@login_required
-def join_event(event_id):
-    event = Event.query.get_or_404(event_id)
-    if event not in current_user.joined_events:
-        current_user.joined_events.append(event)
-        db.session.commit()
-        flash('Successfully joined the event!')
-    return redirect(url_for('event_details', event_id=event_id))
 
 @app.route('/exit_event/<int:event_id>', methods=['POST'])
 @login_required
 def exit_event(event_id):
     event = Event.query.get_or_404(event_id)
-    if event in current_user.joined_events:
-        current_user.joined_events.remove(event)
+    if event in current_user.events:
+        current_user.events.remove(event)
         db.session.commit()
         flash('Successfully exited the event!')
     return redirect(url_for('joined_events'))
@@ -163,7 +327,21 @@ def logout():
 @app.route('/profile')
 @login_required
 def profile():
-    return render_template('profile.html', user=current_user, now=datetime.utcnow())
+    # Get user's events
+    user_events = current_user.events  # This is already a list, no need for .all()
+    upcoming_events = [event for event in user_events if event.date > datetime.utcnow()]
+    past_events = [event for event in user_events if event.date <= datetime.utcnow()]
+    
+    # Get user's preferences
+    preferences = current_user.get_preferences()
+    
+    return render_template('profile.html', 
+        user=current_user,
+        upcoming_events=upcoming_events,
+        past_events=past_events,
+        preferences=preferences,
+        now=datetime.utcnow()
+    )
 
 @app.route('/profile/edit', methods=['GET', 'POST'])
 @login_required
@@ -181,16 +359,19 @@ def edit_profile():
                 current_user.profile_picture = filename
         
         # Update preferences
-        preferences = current_user.preferences or {}
+        preferences = current_user.get_preferences()
         preferences['notifications'] = request.form.get('notifications') == 'on'
         preferences['email_updates'] = request.form.get('email_updates') == 'on'
-        current_user.preferences = preferences
+        current_user.set_preferences(preferences)
         
         db.session.commit()
         flash('Profile updated successfully!', 'success')
         return redirect(url_for('profile'))
     
-    return render_template('edit_profile.html', user=current_user)
+    return render_template('edit_profile.html', 
+        user=current_user,
+        preferences=current_user.get_preferences()
+    )
 
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in {'png', 'jpg', 'jpeg', 'gif'}
@@ -202,10 +383,10 @@ def init_db():
         # Create all tables
         db.create_all()
         
-        # Create a test user
+        # Create a test user with a unique email
         test_user = User(
             username='test',
-            email='test@example.com'
+            email=f'test_{datetime.now().timestamp()}@example.com'
         )
         test_user.set_password('test123')
         db.session.add(test_user)
@@ -250,7 +431,9 @@ Gold Sponsors:
 - IBM
 - Oracle
 - Salesforce''',
-                image_url='https://images.unsplash.com/photo-1505373877841-8d25f7d46678'
+                image_url='https://images.unsplash.com/photo-1505373877841-8d25f7d46678',
+                organizer_id=1,
+                created_by=1
             ),
             Event(
                 title='Music Festival 2024',
@@ -295,7 +478,9 @@ Sponsored by:
 - Red Bull
 - Coca-Cola
 - Samsung''',
-                image_url='https://images.unsplash.com/photo-1470229722913-7c0e2dbbafd3'
+                image_url='https://images.unsplash.com/photo-1470229722913-7c0e2dbbafd3',
+                organizer_id=1,
+                created_by=1
             ),
             Event(
                 title='Startup Pitch Competition',
@@ -331,7 +516,9 @@ Supported by:
 - Silicon Valley Bank
 - Stripe
 - AWS Startups''',
-                image_url='https://images.unsplash.com/photo-1552664730-d307ca884978'
+                image_url='https://images.unsplash.com/photo-1552664730-d307ca884978',
+                organizer_id=1,
+                created_by=1
             )
         ]
         
@@ -381,15 +568,168 @@ Afternoon:
 - Company A
 - Organization B
 - Corporation C''',
-                image_url=f'https://source.unsplash.com/random/800x600/?{category.lower()}'
+                image_url=f'https://source.unsplash.com/random/800x600/?{category.lower()}',
+                organizer_id=1,
+                created_by=1
             )
             events.append(event)
         
         for event in events:
             db.session.add(event)
         
+        try:
+            db.session.commit()
+        except Exception as e:
+            db.session.rollback()
+            print(f"Error during database initialization: {e}")
+            raise
+
+@app.route('/event/<int:event_id>/comment', methods=['POST'])
+@login_required
+def add_comment(event_id):
+    event = Event.query.get_or_404(event_id)
+    content = request.form.get('content')
+    parent_id = request.form.get('parent_id')
+    
+    if content:
+        comment = EventComment(
+            event_id=event_id,
+            user_id=current_user.id,
+            content=content,
+            parent_id=parent_id if parent_id else None
+        )
+        db.session.add(comment)
         db.session.commit()
+        flash('Comment added successfully!', 'success')
+    
+    return redirect(url_for('event_details', event_id=event_id))
+
+@app.route('/event/<int:event_id>/rate', methods=['POST'])
+@login_required
+def rate_event(event_id):
+    event = Event.query.get_or_404(event_id)
+    rating = request.form.get('rating')
+    review = request.form.get('review')
+    
+    if rating:
+        # Check if user has already rated this event
+        existing_rating = EventRating.query.filter_by(
+            event_id=event_id,
+            user_id=current_user.id
+        ).first()
+        
+        if existing_rating:
+            existing_rating.rating = rating
+            existing_rating.review = review
+        else:
+            new_rating = EventRating(
+                event_id=event_id,
+                user_id=current_user.id,
+                rating=rating,
+                review=review
+            )
+            db.session.add(new_rating)
+        
+        db.session.commit()
+        flash('Rating submitted successfully!', 'success')
+    
+    return redirect(url_for('event_details', event_id=event_id))
+
+@app.route('/event/<int:event_id>/like', methods=['POST'])
+@login_required
+def like_event(event_id):
+    event = Event.query.get_or_404(event_id)
+    event.increment_likes()
+    return jsonify({'likes': event.likes})
+
+@app.route('/event/<int:event_id>/share', methods=['POST'])
+@login_required
+def share_event(event_id):
+    event = Event.query.get_or_404(event_id)
+    event.increment_shares()
+    return jsonify({'shares': event.shares})
+
+@app.route('/analytics')
+@login_required
+def analytics():
+    # Get user's event statistics
+    user_events = Event.query.filter_by(created_by=current_user.id).all()
+    
+    # Calculate statistics
+    total_events = len(user_events)
+    total_views = sum(event.views for event in user_events)
+    total_likes = sum(event.likes for event in user_events)
+    total_revenue = sum(event.revenue for event in user_events)
+    
+    # Get event categories distribution
+    categories = {}
+    for event in user_events:
+        categories[event.category] = categories.get(event.category, 0) + 1
+    
+    # Get recent comments
+    recent_comments = EventComment.query.join(Event).filter(
+        Event.created_by == current_user.id
+    ).order_by(EventComment.created_at.desc()).limit(5).all()
+    
+    return render_template('analytics.html',
+        total_events=total_events,
+        total_views=total_views,
+        total_likes=total_likes,
+        total_revenue=total_revenue,
+        categories=categories,
+        recent_comments=recent_comments
+    )
+
+@app.route('/search')
+def search_events():
+    query = request.args.get('q', '')
+    category = request.args.get('category')
+    min_price = request.args.get('min_price')
+    max_price = request.args.get('max_price')
+    date_from = request.args.get('date_from')
+    date_to = request.args.get('date_to')
+    
+    # Start with base query
+    events_query = Event.query
+    
+    # Apply filters
+    if query:
+        events_query = events_query.filter(
+            (Event.title.ilike(f'%{query}%')) |
+            (Event.description.ilike(f'%{query}%')) |
+            (Event.tags.ilike(f'%{query}%'))
+        )
+    
+    if category:
+        events_query = events_query.filter_by(category=category)
+    
+    if min_price:
+        events_query = events_query.filter(Event.price >= float(min_price))
+    
+    if max_price:
+        events_query = events_query.filter(Event.price <= float(max_price))
+    
+    if date_from:
+        events_query = events_query.filter(Event.date >= datetime.strptime(date_from, '%Y-%m-%d'))
+    
+    if date_to:
+        events_query = events_query.filter(Event.date <= datetime.strptime(date_to, '%Y-%m-%d'))
+    
+    # Get unique categories for filter dropdown
+    categories = db.session.query(Event.category.distinct()).all()
+    
+    events = events_query.all()
+    return render_template('search.html',
+        events=events,
+        categories=[c[0] for c in categories],
+        query=query,
+        selected_category=category,
+        min_price=min_price,
+        max_price=max_price,
+        date_from=date_from,
+        date_to=date_to
+    )
 
 if __name__ == '__main__':
     init_db()
-    app.run(debug=True) 
+    socketio.run(app, debug=True) 
