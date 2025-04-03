@@ -127,8 +127,7 @@
                 <div class="col-md-4">
                     <div class="event-card">
                         <div class="event-image">
-                            <img src="{{ event.image_url or 'https://images.unsplash.com/photo-1511578314322-379afb476865?ixlib=rb-1.2.1&auto=format&fit=crop&w=500&q=80' }}" 
-                                 alt="{{ event.title }}">
+                            <img src="{{ event.get_image_url() }}" alt="{{ event.title }}">
                         </div>
                         <div class="event-info">
                             <h3>{{ event.title }}</h3>

@@ -1072,6 +1072,9 @@ def create_event():
         category = request.form.get('category')
         capacity = int(request.form.get('capacity'))
         price = float(request.form.get('price'))
+        organizer = request.form.get('organizer')
+        contact_email = request.form.get('contact_email')
+        contact_phone = request.form.get('contact_phone')
         requirements = request.form.get('requirements')
         schedule = request.form.get('schedule')
         speakers = request.form.get('speakers')
@@ -1096,6 +1099,9 @@ def create_event():
             category=category,
             capacity=capacity,
             price=price,
+            organizer=organizer,
+            contact_email=contact_email,
+            contact_phone=contact_phone,
             requirements=requirements,
             schedule=schedule,
             speakers=speakers,
@@ -1126,4 +1132,4 @@ if __name__ == '__main__':
             print("Database already exists. Skipping initialization.")
     
     # Run the application
-    socketio.run(app, debug=True) 
+    app.run(host='0.0.0.0', port=5000, debug=True) 

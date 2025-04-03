@@ -58,11 +58,9 @@
             <div class="events-grid">
                 {% for event in events %}
                 <div class="event-card">
-                    {% if event.image_url %}
                     <div class="event-image">
-                        <img src="{{ event.image_url }}" alt="{{ event.title }}">
+                        <img src="{{ event.get_image_url() }}" alt="{{ event.title }}">
                     </div>
-                    {% endif %}
                     
                     <div class="event-content">
                         <h3>{{ event.title }}</h3>

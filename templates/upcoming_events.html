@@ -47,7 +47,7 @@
         <div class="col">
             <div class="card h-100 event-card shadow-sm">
                 <!-- Event Image -->
-                <div class="card-img-top event-image" style="background-image: url('{{ event.image_url or url_for('static', filename='images/default-event.jpg') }}');">
+                <div class="card-img-top event-image" style="background-image: url('{{ event.get_image_url() }}');">
                     {% if event.is_featured %}
                     <span class="badge bg-primary position-absolute top-0 end-0 m-2">
                         <i class="fas fa-star me-1"></i>Featured

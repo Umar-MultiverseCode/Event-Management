@@ -44,7 +44,7 @@
                 <div class="events-grid">
                     {% for event in upcoming_events %}
                         <div class="event-card">
-                            <img src="{{ event.image_url }}" alt="{{ event.title }}">
+                            <img src="{{ event.get_image_url() }}" alt="{{ event.title }}">
                             <div class="event-info">
                                 <h3>{{ event.title }}</h3>
                                 <p class="date">{{ event.date.strftime('%B %d, %Y') }}</p>
@@ -65,7 +65,7 @@
                 <div class="events-grid">
                     {% for event in past_events %}
                         <div class="event-card">
-                            <img src="{{ event.image_url }}" alt="{{ event.title }}">
+                            <img src="{{ event.get_image_url() }}" alt="{{ event.title }}">
                             <div class="event-info">
                                 <h3>{{ event.title }}</h3>
                                 <p class="date">{{ event.date.strftime('%B %d, %Y') }}</p>
