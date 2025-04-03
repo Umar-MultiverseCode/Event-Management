@@ -1,0 +1,129 @@
+{% extends "base.html" %}
+
+{% block title %}{{ event.title }}{% endblock %}
+
+{% block content %}
+<div class="event-details">
+    <div class="card">
+        <div class="event-header" style="display: flex; gap: 30px; margin-bottom: 30px;">
+            <div class="event-image" style="flex: 1;">
+                <img src="{{ event.image_url }}" alt="{{ event.title }}" style="width: 100%; height: 300px; object-fit: cover; border-radius: 12px;">
+            </div>
+            <div class="event-basic-info" style="flex: 1;">
+                <h2 style="margin-bottom: 20px; color: #2c3e50;">{{ event.title }}</h2>
+                <div class="info-grid" style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 15px;">
+                    <div class="info-item">
+                        <strong>Date:</strong>
+                        <p>{{ event.date.strftime('%B %d, %Y at %I:%M %p') }}</p>
+                    </div>
+                    <div class="info-item">
+                        <strong>Venue:</strong>
+                        <p>{{ event.venue }}</p>
+                    </div>
+                    <div class="info-item">
+                        <strong>Category:</strong>
+                        <p>{{ event.category }}</p>
+                    </div>
+                    <div class="info-item">
+                        <strong>Capacity:</strong>
+                        <p>{{ event.capacity }} attendees</p>
+                    </div>
+                    <div class="info-item">
+                        <strong>Price:</strong>
+                        <p>${{ "%.2f"|format(event.price) }}</p>
+                    </div>
+                    <div class="info-item">
+                        <strong>Organizer:</strong>
+                        <p>{{ event.organizer }}</p>
+                    </div>
+                </div>
+                <div class="event-actions" style="margin-top: 20px;">
+                    {% if is_joined %}
+                        <p style="color: green; font-weight: bold; margin-bottom: 15px;">You have joined this event!</p>
+                        <form method="POST" action="{{ url_for('exit_event', event_id=event.id) }}" style="display: inline;">
+                            <button type="submit" class="btn btn-danger">Exit Event</button>
+                        </form>
+                    {% else %}
+                        <form method="POST" action="{{ url_for('join_event', event_id=event.id) }}" style="display: inline;">
+                            <button type="submit" class="btn">Join Event</button>
+                        </form>
+                    {% endif %}
+                    <a href="{{ url_for('dashboard') }}" class="btn">Back to Dashboard</a>
+                </div>
+            </div>
+        </div>
+
+        <div class="event-description" style="margin-bottom: 30px;">
+            <h3 style="color: #2c3e50; margin-bottom: 15px;">About the Event</h3>
+            <p style="line-height: 1.8; color: #4a5568;">{{ event.description }}</p>
+        </div>
+
+        <div class="event-schedule" style="margin-bottom: 30px;">
+            <h3 style="color: #2c3e50; margin-bottom: 15px;">Schedule</h3>
+            <div style="background: #f8f9fa; padding: 20px; border-radius: 8px;">
+                <pre style="white-space: pre-wrap; font-family: 'Poppins', sans-serif; color: #4a5568;">{{ event.schedule }}</pre>
+            </div>
+        </div>
+
+        <div class="event-details-grid" style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 30px;">
+            <div class="event-speakers">
+                <h3 style="color: #2c3e50; margin-bottom: 15px;">Speakers</h3>
+                <div style="background: #f8f9fa; padding: 20px; border-radius: 8px;">
+                    <pre style="white-space: pre-wrap; font-family: 'Poppins', sans-serif; color: #4a5568;">{{ event.speakers }}</pre>
+                </div>
+            </div>
+
+            <div class="event-sponsors">
+                <h3 style="color: #2c3e50; margin-bottom: 15px;">Sponsors</h3>
+                <div style="background: #f8f9fa; padding: 20px; border-radius: 8px;">
+                    <pre style="white-space: pre-wrap; font-family: 'Poppins', sans-serif; color: #4a5568;">{{ event.sponsors }}</pre>
+                </div>
+            </div>
+        </div>
+
+        <div class="event-requirements" style="margin-top: 30px;">
+            <h3 style="color: #2c3e50; margin-bottom: 15px;">Requirements</h3>
+            <div style="background: #f8f9fa; padding: 20px; border-radius: 8px;">
+                <p style="color: #4a5568;">{{ event.requirements }}</p>
+            </div>
+        </div>
+
+        <div class="event-contact" style="margin-top: 30px;">
+            <h3 style="color: #2c3e50; margin-bottom: 15px;">Contact Information</h3>
+            <div style="background: #f8f9fa; padding: 20px; border-radius: 8px;">
+                <p style="margin-bottom: 10px;"><strong>Email:</strong> {{ event.contact_email }}</p>
+                <p><strong>Phone:</strong> {{ event.contact_phone }}</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .event-details {
+        max-width: 1200px;
+        margin: 0 auto;
+    }
+    .info-item {
+        background: #f8f9fa;
+        padding: 15px;
+        border-radius: 8px;
+    }
+    .info-item strong {
+        display: block;
+        margin-bottom: 5px;
+        color: #2c3e50;
+    }
+    .info-item p {
+        margin: 0;
+        color: #4a5568;
+    }
+    @media (max-width: 768px) {
+        .event-header {
+            flex-direction: column;
+        }
+        .event-details-grid {
+            grid-template-columns: 1fr;
+        }
+    }
+</style>
+{% endblock %} 
