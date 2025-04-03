@@ -377,6 +377,62 @@
                 min-width: 16px;
             }
         }
+
+        /* Add these styles to your existing styles */
+        .dropdown {
+            position: relative;
+            display: inline-block;
+        }
+
+        .dropdown-toggle {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .dropdown-content {
+            display: none;
+            position: absolute;
+            background: var(--header-bg);
+            min-width: 160px;
+            box-shadow: 0 8px 16px var(--shadow-color);
+            border-radius: 8px;
+            z-index: 1;
+            top: 100%;
+            right: 0;
+        }
+
+        .dropdown:hover .dropdown-content {
+            display: block;
+        }
+
+        .dropdown-content a {
+            color: white;
+            padding: 12px 16px;
+            text-decoration: none;
+            display: block;
+            transition: background-color 0.3s;
+        }
+
+        .dropdown-content a:hover {
+            background-color: rgba(255, 255, 255, 0.1);
+        }
+
+        .dropdown-content .notification-link {
+            position: relative;
+        }
+
+        @media (max-width: 768px) {
+            .dropdown-content {
+                position: static;
+                box-shadow: none;
+                background: transparent;
+            }
+            
+            .dropdown-content a {
+                padding: 8px 15px;
+            }
+        }
     </style>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
 </head>
@@ -385,19 +441,27 @@
         <h1>Event Management System</h1>
         <div style="display: flex; align-items: center; gap: 20px;">
             <nav class="nav-links">
-                {% if current_user.is_authenticated %}
+                {% if current_user and current_user.is_authenticated %}
                     <a href="{{ url_for('dashboard') }}">Dashboard</a>
-                    <a href="{{ url_for('upcoming_events') }}">Upcoming Events</a>
-                    <a href="{{ url_for('joined_events') }}">Joined Events</a>
+                    <a href="{{ url_for('upcoming_events') }}">Events</a>
                     <a href="{{ url_for('profile') }}">Profile</a>
-                    <a href="{{ url_for('notifications') }}" class="notification-link">
-                        Notifications
-                        {% if current_user.notifications|selectattr('is_read', 'equalto', False)|list|length > 0 %}
-                        <span class="notification-badge">{{ current_user.notifications|selectattr('is_read', 'equalto', False)|list|length }}</span>
-                        {% endif %}
-                    </a>
+                    <div class="dropdown">
+                        <a href="#" class="dropdown-toggle">
+                            More <i class="fas fa-chevron-down"></i>
+                        </a>
+                        <div class="dropdown-content">
+                            <a href="{{ url_for('achievements') }}">Achievements</a>
+                            <a href="{{ url_for('leaderboard') }}">Leaderboard</a>
+                            <a href="{{ url_for('notifications') }}" class="notification-link">
+                                Notifications
+                                {% if current_user.notifications|selectattr('is_read', 'equalto', False)|list|length > 0 %}
+                                <span class="notification-badge">{{ current_user.notifications|selectattr('is_read', 'equalto', False)|list|length }}</span>
+                                {% endif %}
+                            </a>
+                        </div>
+                    </div>
                     <a href="{{ url_for('logout') }}">Logout</a>
-                {% else %}
+                {% elif request.endpoint not in ['login', 'register'] %}
                     <a href="{{ url_for('login') }}">Login</a>
                     <a href="{{ url_for('register') }}">Register</a>
                 {% endif %}

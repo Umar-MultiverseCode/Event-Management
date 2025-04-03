@@ -1,0 +1,178 @@
+{% extends "base.html" %}
+
+{% block title %}Leaderboard{% endblock %}
+
+{% block content %}
+<div class="leaderboard-container">
+    <div class="leaderboard-header">
+        <h1>Top Event Enthusiasts</h1>
+        <p>See who's leading the pack in event participation and achievements</p>
+    </div>
+
+    <div class="leaderboard-table">
+        <div class="leaderboard-header-row">
+            <div class="rank">Rank</div>
+            <div class="user">User</div>
+            <div class="level">Level</div>
+            <div class="points">Points</div>
+            <div class="achievements">Achievements</div>
+        </div>
+        
+        {% for user in top_users %}
+            <div class="leaderboard-row {% if user.id == current_user.id %}current-user{% endif %}">
+                <div class="rank">{{ loop.index }}</div>
+                <div class="user">
+                    <div class="user-info">
+                        {% if user.profile_picture %}
+                            <img src="{{ url_for('static', filename='profile_pictures/' + user.profile_picture) }}" alt="{{ user.username }}">
+                        {% else %}
+                            <div class="default-avatar">{{ user.username[0].upper() }}</div>
+                        {% endif %}
+                        <span>{{ user.username }}</span>
+                    </div>
+                </div>
+                <div class="level">
+                    <div class="level-badge">Lvl {{ user.points.level if user.points else 1 }}</div>
+                </div>
+                <div class="points">{{ user.points.points if user.points else 0 }}</div>
+                <div class="achievements">{{ user.achievements|length }}</div>
+            </div>
+        {% endfor %}
+    </div>
+
+    <div class="leaderboard-actions">
+        <a href="{{ url_for('achievements') }}" class="btn btn-secondary">View Your Achievements</a>
+    </div>
+</div>
+
+<style>
+.leaderboard-container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 2rem;
+}
+
+.leaderboard-header {
+    text-align: center;
+    margin-bottom: 2rem;
+}
+
+.leaderboard-header h1 {
+    margin: 0 0 0.5rem;
+    color: var(--text-color);
+}
+
+.leaderboard-header p {
+    color: var(--secondary-text);
+    margin: 0;
+}
+
+.leaderboard-table {
+    background-color: var(--card-bg);
+    border-radius: 8px;
+    overflow: hidden;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.leaderboard-header-row {
+    display: grid;
+    grid-template-columns: 60px 2fr 1fr 1fr 1fr;
+    padding: 1rem;
+    background-color: var(--primary-color);
+    color: white;
+    font-weight: bold;
+}
+
+.leaderboard-row {
+    display: grid;
+    grid-template-columns: 60px 2fr 1fr 1fr 1fr;
+    padding: 1rem;
+    align-items: center;
+    border-bottom: 1px solid var(--border-color);
+    transition: background-color 0.3s ease;
+}
+
+.leaderboard-row:hover {
+    background-color: var(--bg-color);
+}
+
+.leaderboard-row.current-user {
+    background-color: rgba(var(--primary-color-rgb), 0.1);
+    font-weight: bold;
+}
+
+.rank {
+    text-align: center;
+    font-weight: bold;
+}
+
+.user-info {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.user-info img {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    object-fit: cover;
+}
+
+.default-avatar {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background-color: var(--primary-color);
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+}
+
+.level-badge {
+    background-color: var(--primary-color);
+    color: white;
+    padding: 0.25rem 0.75rem;
+    border-radius: 20px;
+    font-size: 0.9rem;
+    display: inline-block;
+}
+
+.points, .achievements {
+    text-align: center;
+    font-weight: 500;
+}
+
+.leaderboard-actions {
+    text-align: center;
+    margin-top: 2rem;
+}
+
+@media (max-width: 768px) {
+    .leaderboard-container {
+        padding: 1rem;
+    }
+    
+    .leaderboard-header-row,
+    .leaderboard-row {
+        grid-template-columns: 40px 2fr 1fr;
+    }
+    
+    .points, .achievements {
+        display: none;
+    }
+    
+    .user-info {
+        gap: 0.5rem;
+    }
+    
+    .user-info img,
+    .default-avatar {
+        width: 30px;
+        height: 30px;
+    }
+}
+</style>
+{% endblock %} 

@@ -1,0 +1,184 @@
+{% extends "base.html" %}
+
+{% block title %}Achievements{% endblock %}
+
+{% block content %}
+<div class="achievements-container">
+    <div class="achievements-header">
+        <h1>Your Achievements</h1>
+        <div class="user-stats">
+            <div class="stat-card">
+                <h3>Level</h3>
+                <p class="stat-value">{{ current_user.points.level if current_user.points else 1 }}</p>
+            </div>
+            <div class="stat-card">
+                <h3>Points</h3>
+                <p class="stat-value">{{ current_user.points.points if current_user.points else 0 }}</p>
+            </div>
+            <div class="stat-card">
+                <h3>Achievements</h3>
+                <p class="stat-value">{{ current_user.achievements|length }}/{{ achievements|length }}</p>
+            </div>
+        </div>
+    </div>
+
+    <div class="achievements-grid">
+        {% for achievement in achievements %}
+            <div class="achievement-card {% if achievement.id in user_achievements %}earned{% else %}locked{% endif %}">
+                <div class="achievement-icon">
+                    <i class="fas fa-{{ achievement.icon }}"></i>
+                </div>
+                <div class="achievement-info">
+                    <h3>{{ achievement.name }}</h3>
+                    <p>{{ achievement.description }}</p>
+                    <div class="achievement-points">
+                        <i class="fas fa-star"></i>
+                        <span>{{ achievement.points }} points</span>
+                    </div>
+                </div>
+                {% if achievement.id in user_achievements %}
+                    <div class="achievement-badge">
+                        <i class="fas fa-check"></i>
+                    </div>
+                {% endif %}
+            </div>
+        {% endfor %}
+    </div>
+
+    <div class="leaderboard-link">
+        <a href="{{ url_for('leaderboard') }}" class="btn btn-primary">View Leaderboard</a>
+    </div>
+</div>
+
+<style>
+.achievements-container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 2rem;
+}
+
+.achievements-header {
+    text-align: center;
+    margin-bottom: 2rem;
+}
+
+.user-stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1rem;
+    margin: 2rem 0;
+}
+
+.stat-card {
+    background-color: var(--card-bg);
+    padding: 1.5rem;
+    border-radius: 8px;
+    text-align: center;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.stat-card h3 {
+    margin: 0;
+    color: var(--secondary-text);
+    font-size: 1rem;
+}
+
+.stat-value {
+    font-size: 2rem;
+    font-weight: bold;
+    color: var(--primary-color);
+    margin: 0.5rem 0 0;
+}
+
+.achievements-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 1.5rem;
+    margin-bottom: 2rem;
+}
+
+.achievement-card {
+    background-color: var(--card-bg);
+    padding: 1.5rem;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    position: relative;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    opacity: 0.7;
+    transition: all 0.3s ease;
+}
+
+.achievement-card.earned {
+    opacity: 1;
+    border-left: 4px solid var(--primary-color);
+}
+
+.achievement-card.locked {
+    background-color: var(--bg-color);
+}
+
+.achievement-icon {
+    width: 50px;
+    height: 50px;
+    background-color: var(--primary-color);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-size: 1.5rem;
+}
+
+.achievement-info {
+    flex: 1;
+}
+
+.achievement-info h3 {
+    margin: 0 0 0.5rem;
+    color: var(--text-color);
+}
+
+.achievement-info p {
+    margin: 0;
+    color: var(--secondary-text);
+    font-size: 0.9rem;
+}
+
+.achievement-points {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-top: 0.5rem;
+    color: var(--primary-color);
+    font-weight: 500;
+}
+
+.achievement-badge {
+    position: absolute;
+    top: 1rem;
+    right: 1rem;
+    color: var(--primary-color);
+}
+
+.leaderboard-link {
+    text-align: center;
+    margin-top: 2rem;
+}
+
+@media (max-width: 768px) {
+    .achievements-container {
+        padding: 1rem;
+    }
+    
+    .achievements-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .user-stats {
+        grid-template-columns: 1fr;
+    }
+}
+</style>
+{% endblock %} 

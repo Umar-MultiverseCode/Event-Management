@@ -20,6 +20,8 @@ db = SQLAlchemy(app)
 login_manager = LoginManager()
 login_manager.init_app(app)
 login_manager.login_view = 'login'
+login_manager.login_message = 'Please log in to access this page.'
+login_manager.login_message_category = 'error'
 socketio = SocketIO(app)
 
 # Notification model
@@ -63,6 +65,32 @@ class EventRating(db.Model):
     user = db.relationship('User', backref='ratings')
     event = db.relationship('Event', backref='ratings')
 
+# Achievement model
+class Achievement(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(100), nullable=False)
+    description = db.Column(db.Text, nullable=False)
+    points = db.Column(db.Integer, nullable=False)
+    icon = db.Column(db.String(100))
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+# User Achievement model
+class UserAchievement(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    achievement_id = db.Column(db.Integer, db.ForeignKey('achievement.id'), nullable=False)
+    earned_at = db.Column(db.DateTime, default=datetime.utcnow)
+    user = db.relationship('User', backref=db.backref('achievements', lazy=True))
+    achievement = db.relationship('Achievement')
+
+# User Points model
+class UserPoints(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    points = db.Column(db.Integer, default=0)
+    level = db.Column(db.Integer, default=1)
+    user = db.relationship('User', backref=db.backref('points', uselist=False))
+
 # Update User model
 class User(UserMixin, db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -75,6 +103,12 @@ class User(UserMixin, db.Model):
     last_seen = db.Column(db.DateTime, default=datetime.utcnow)
     events = db.relationship('Event', secondary='user_events', backref=db.backref('attendees', lazy='dynamic'))
     preferences = db.Column(db.Text)  # JSON string for user preferences
+
+    def __init__(self, **kwargs):
+        super(User, self).__init__(**kwargs)
+        # Initialize points when a new user is created
+        self.points = UserPoints(user_id=self.id, points=0, level=1)
+        db.session.add(self.points)
 
     def set_password(self, password):
         self.password_hash = generate_password_hash(password)
@@ -89,6 +123,36 @@ class User(UserMixin, db.Model):
 
     def set_preferences(self, preferences):
         self.preferences = json.dumps(preferences)
+
+    def add_points(self, points):
+        if not hasattr(self, 'points') or not self.points:
+            self.points = UserPoints(user_id=self.id, points=0, level=1)
+            db.session.add(self.points)
+        self.points.points += points
+        self.update_level()
+        db.session.commit()
+    
+    def update_level(self):
+        if not hasattr(self, 'points') or not self.points:
+            self.points = UserPoints(user_id=self.id, points=0, level=1)
+            db.session.add(self.points)
+        # Simple leveling system: level = floor(sqrt(points / 100))
+        new_level = int((self.points.points / 100) ** 0.5) + 1
+        if new_level > self.points.level:
+            self.points.level = new_level
+            # Create level up achievement
+            achievement = Achievement.query.filter_by(name=f"Level {new_level}").first()
+            if achievement:
+                self.earn_achievement(achievement)
+    
+    def earn_achievement(self, achievement):
+        if not UserAchievement.query.filter_by(user_id=self.id, achievement_id=achievement.id).first():
+            user_achievement = UserAchievement(user_id=self.id, achievement_id=achievement.id)
+            db.session.add(user_achievement)
+            self.add_points(achievement.points)
+            db.session.commit()
+            return True
+        return False
 
 # Update Event model
 class Event(db.Model):
@@ -305,8 +369,24 @@ def joined_events():
 @login_required
 def event_details(event_id):
     event = Event.query.get_or_404(event_id)
-    is_joined = event in current_user.events
-    return render_template('event_details.html', event=event, is_joined=is_joined)
+    is_organizer = event.organizer_id == current_user.id
+    is_registered = event in current_user.events
+    
+    # Check for achievements
+    if is_registered:
+        first_event = Achievement.query.filter_by(name="First Event").first()
+        if first_event:
+            current_user.earn_achievement(first_event)
+        
+        if len(current_user.events) >= 5:
+            event_enthusiast = Achievement.query.filter_by(name="Event Enthusiast").first()
+            if event_enthusiast:
+                current_user.earn_achievement(event_enthusiast)
+    
+    return render_template('event_details.html', 
+                         event=event,
+                         is_organizer=is_organizer,
+                         is_registered=is_registered)
 
 @app.route('/exit_event/<int:event_id>', methods=['POST'])
 @login_required
@@ -395,7 +475,7 @@ def init_db():
         events = [
             Event(
                 title='Tech Conference 2024',
-                description='Join us for the most anticipated tech conference of the year! This event brings together industry leaders, innovators, and tech enthusiasts for three days of learning, networking, and inspiration. Featuring keynote speeches, panel discussions, and hands-on workshops.',
+                description='Join us for the most anticipated tech conference of the year!',
                 date=datetime(2024, 6, 15, 9, 0),
                 venue='Convention Center, New York',
                 category='Technology',
@@ -405,32 +485,9 @@ def init_db():
                 contact_email='info@techconference.com',
                 contact_phone='+1 (555) 123-4567',
                 requirements='Laptop, Notebook, Business Cards',
-                schedule='''Day 1:
-- 9:00 AM: Registration
-- 10:00 AM: Opening Keynote
-- 12:00 PM: Lunch
-- 2:00 PM: Panel Discussion
-- 4:00 PM: Workshops
-- 6:00 PM: Networking Reception
-
-Day 2:
-- 9:00 AM: Morning Sessions
-- 12:00 PM: Lunch
-- 2:00 PM: Breakout Sessions
-- 5:00 PM: Closing Remarks''',
-                speakers='''John Smith - CEO, TechCorp
-Sarah Johnson - CTO, InnovateX
-Michael Brown - AI Researcher, Stanford
-Emily Davis - Product Manager, Google''',
-                sponsors='''Platinum Sponsors:
-- Microsoft
-- Amazon Web Services
-- Google Cloud
-
-Gold Sponsors:
-- IBM
-- Oracle
-- Salesforce''',
+                schedule='Day 1: Registration, Keynote, Workshops\nDay 2: Panel Discussions, Networking',
+                speakers='John Smith, Sarah Johnson, Michael Brown',
+                sponsors='Microsoft, Amazon, Google',
                 image_url='https://images.unsplash.com/photo-1505373877841-8d25f7d46678',
                 organizer_id=1,
                 created_by=1
@@ -576,6 +633,20 @@ Afternoon:
         
         for event in events:
             db.session.add(event)
+        
+        # Create default achievements
+        achievements = [
+            Achievement(name="First Event", description="Attend your first event", points=50, icon="first-event"),
+            Achievement(name="Event Enthusiast", description="Attend 5 events", points=100, icon="enthusiast"),
+            Achievement(name="Social Butterfly", description="Comment on 10 events", points=75, icon="social"),
+            Achievement(name="Event Organizer", description="Create your first event", points=150, icon="organizer"),
+            Achievement(name="Level 2", description="Reach level 2", points=0, icon="level-2"),
+            Achievement(name="Level 5", description="Reach level 5", points=0, icon="level-5"),
+            Achievement(name="Level 10", description="Reach level 10", points=0, icon="level-10")
+        ]
+        
+        for achievement in achievements:
+            db.session.add(achievement)
         
         try:
             db.session.commit()
@@ -729,6 +800,20 @@ def search_events():
         date_from=date_from,
         date_to=date_to
     )
+
+@app.route('/achievements')
+@login_required
+def achievements():
+    all_achievements = Achievement.query.all()
+    user_achievements = {ua.achievement_id for ua in current_user.achievements}
+    return render_template('achievements.html', 
+                         achievements=all_achievements,
+                         user_achievements=user_achievements)
+
+@app.route('/leaderboard')
+def leaderboard():
+    top_users = User.query.join(UserPoints).order_by(UserPoints.points.desc()).limit(10).all()
+    return render_template('leaderboard.html', top_users=top_users)
 
 if __name__ == '__main__':
     init_db()
