@@ -3,7 +3,7 @@
 {% block title %}Login{% endblock %}
 
 {% block content %}
-<div class="card">
+<div class="form-container">
     <h2>Login</h2>
     <form method="POST">
         <div class="form-group">
@@ -14,8 +14,8 @@
             <label for="password">Password</label>
             <input type="password" id="password" name="password" required>
         </div>
-        <button type="submit" class="btn">Login</button>
+        <button type="submit">Login</button>
     </form>
-    <p style="margin-top: 20px;">Don't have an account? <a href="{{ url_for('register') }}">Register here</a></p>
+    <p>Don't have an account? <a href="{{ url_for('register') }}">Register here</a></p>
 </div>
 {% endblock %} 
