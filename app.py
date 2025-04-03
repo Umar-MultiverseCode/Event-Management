@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, redirect, url_for, flash, jsonify, send_from_directory
+from flask import Flask, render_template, request, redirect, url_for, flash, jsonify, send_from_directory, session
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager, UserMixin, login_user, login_required, logout_user, current_user
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -17,7 +17,7 @@ import time
 from sqlalchemy import func
 
 app = Flask(__name__)
-app.config['SECRET_KEY'] = 'your-secret-key'
+app.config['SECRET_KEY'] = 'your-secret-key-here'
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///events.db'
 app.config['UPLOAD_FOLDER'] = 'static/uploads'
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max file size
@@ -937,8 +937,10 @@ def achievements():
 
 @app.route('/toggle_night_mode', methods=['POST'])
 def toggle_night_mode():
-    session['night_mode'] = not session.get('night_mode', False)
-    return jsonify({'success': True})
+    if 'night_mode' not in session:
+        session['night_mode'] = False
+    session['night_mode'] = not session['night_mode']
+    return jsonify({'success': True, 'night_mode': session['night_mode']})
 
 @app.route('/leaderboard')
 def leaderboard():

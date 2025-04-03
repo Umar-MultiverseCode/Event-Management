@@ -265,20 +265,22 @@
                 headers: {
                     'Content-Type': 'application/json',
                 }
-            }).then(response => response.json())
-              .then(data => {
-                  if (data.success) {
-                      document.body.classList.toggle('night-mode');
-                      const icon = document.querySelector('.btn-night-mode i');
-                      if (document.body.classList.contains('night-mode')) {
-                          icon.classList.remove('fa-moon');
-                          icon.classList.add('fa-sun');
-                      } else {
-                          icon.classList.remove('fa-sun');
-                          icon.classList.add('fa-moon');
-                      }
-                  }
-              });
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    document.body.classList.toggle('night-mode');
+                    const icon = document.querySelector('.btn-night-mode i');
+                    if (data.night_mode) {
+                        icon.classList.remove('fa-moon');
+                        icon.classList.add('fa-sun');
+                    } else {
+                        icon.classList.remove('fa-sun');
+                        icon.classList.add('fa-moon');
+                    }
+                }
+            })
+            .catch(error => console.error('Error:', error));
         }
     </script>
     {% block extra_js %}{% endblock %}
