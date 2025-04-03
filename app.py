@@ -4,10 +4,14 @@ from flask_login import LoginManager, UserMixin, login_user, login_required, log
 from werkzeug.security import generate_password_hash, check_password_hash
 from datetime import datetime, timedelta
 import random
+import os
+from werkzeug.utils import secure_filename
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'your-secret-key-here'
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///events.db'
+app.config['UPLOAD_FOLDER'] = 'static/profile_pictures'
+app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max file size
 db = SQLAlchemy(app)
 login_manager = LoginManager()
 login_manager.init_app(app)
@@ -17,14 +21,30 @@ login_manager.login_view = 'login'
 class User(UserMixin, db.Model):
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(80), unique=True, nullable=False)
-    password_hash = db.Column(db.String(120), nullable=False)
-    joined_events = db.relationship('Event', secondary='user_events', backref='participants')
+    password = db.Column(db.String(120), nullable=False)
+    email = db.Column(db.String(120), unique=True, nullable=False)
+    profile_picture = db.Column(db.String(200), default='default.jpg')
+    bio = db.Column(db.Text, default='')
+    joined_events = db.relationship('Event', secondary='user_events', backref=db.backref('attendees', lazy='dynamic'))
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    last_login = db.Column(db.DateTime)
+    preferences = db.Column(db.JSON, default=lambda: {
+        'notifications': True,
+        'email_updates': True,
+        'theme': 'light'
+    })
 
     def set_password(self, password):
-        self.password_hash = generate_password_hash(password)
+        self.password = generate_password_hash(password)
 
     def check_password(self, password):
-        return check_password_hash(self.password_hash, password)
+        return check_password_hash(self.password, password)
+
+# Association table for User-Event many-to-many relationship
+user_events = db.Table('user_events',
+    db.Column('user_id', db.Integer, db.ForeignKey('user.id'), primary_key=True),
+    db.Column('event_id', db.Integer, db.ForeignKey('event.id'), primary_key=True)
+)
 
 class Event(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -44,11 +64,6 @@ class Event(db.Model):
     speakers = db.Column(db.Text)
     sponsors = db.Column(db.Text)
     image_url = db.Column(db.String(200))
-
-user_events = db.Table('user_events',
-    db.Column('user_id', db.Integer, db.ForeignKey('user.id'), primary_key=True),
-    db.Column('event_id', db.Integer, db.ForeignKey('event.id'), primary_key=True)
-)
 
 @login_manager.user_loader
 def load_user(user_id):
@@ -77,12 +92,17 @@ def register():
     if request.method == 'POST':
         username = request.form.get('username')
         password = request.form.get('password')
+        email = request.form.get('email')
         
         if User.query.filter_by(username=username).first():
             flash('Username already exists')
             return redirect(url_for('register'))
         
-        user = User(username=username)
+        if User.query.filter_by(email=email).first():
+            flash('Email already registered')
+            return redirect(url_for('register'))
+        
+        user = User(username=username, email=email)
         user.set_password(password)
         db.session.add(user)
         db.session.commit()
@@ -140,6 +160,41 @@ def logout():
     logout_user()
     return redirect(url_for('login'))
 
+@app.route('/profile')
+@login_required
+def profile():
+    return render_template('profile.html', user=current_user, now=datetime.utcnow())
+
+@app.route('/profile/edit', methods=['GET', 'POST'])
+@login_required
+def edit_profile():
+    if request.method == 'POST':
+        current_user.email = request.form.get('email', current_user.email)
+        current_user.bio = request.form.get('bio', current_user.bio)
+        
+        # Handle profile picture upload
+        if 'profile_picture' in request.files:
+            file = request.files['profile_picture']
+            if file and allowed_file(file.filename):
+                filename = secure_filename(f"{current_user.id}_{file.filename}")
+                file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
+                current_user.profile_picture = filename
+        
+        # Update preferences
+        preferences = current_user.preferences or {}
+        preferences['notifications'] = request.form.get('notifications') == 'on'
+        preferences['email_updates'] = request.form.get('email_updates') == 'on'
+        current_user.preferences = preferences
+        
+        db.session.commit()
+        flash('Profile updated successfully!', 'success')
+        return redirect(url_for('profile'))
+    
+    return render_template('edit_profile.html', user=current_user)
+
+def allowed_file(filename):
+    return '.' in filename and filename.rsplit('.', 1)[1].lower() in {'png', 'jpg', 'jpeg', 'gif'}
+
 def init_db():
     with app.app_context():
         # Drop all existing tables
@@ -148,7 +203,10 @@ def init_db():
         db.create_all()
         
         # Create a test user
-        test_user = User(username='test')
+        test_user = User(
+            username='test',
+            email='test@example.com'
+        )
         test_user.set_password('test123')
         db.session.add(test_user)
         
