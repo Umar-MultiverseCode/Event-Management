@@ -192,7 +192,7 @@ Gold Sponsors:
 - IBM
 - Oracle
 - Salesforce''',
-                image_url='https://images.unsplash.com/photo-1505373877841-8d25f7d46678'
+                image_url='https://images.unsplash.com/photo-1511795409834-432f31197ce6?w=800&auto=format&fit=crop&q=60'
             ),
             Event(
                 title='Music Festival 2024',
@@ -237,7 +237,7 @@ Sponsored by:
 - Red Bull
 - Coca-Cola
 - Samsung''',
-                image_url='https://images.unsplash.com/photo-1470229722913-7c0e2dbbafd3'
+                image_url='https://images.unsplash.com/photo-1470229722913-7c0e2dbbafd3?w=800&auto=format&fit=crop&q=60'
             ),
             Event(
                 title='Startup Pitch Competition',
@@ -273,13 +273,23 @@ Supported by:
 - Silicon Valley Bank
 - Stripe
 - AWS Startups''',
-                image_url='https://images.unsplash.com/photo-1552664730-d307ca884978'
+                image_url='https://images.unsplash.com/photo-1552664730-d307ca884978?w=800&auto=format&fit=crop&q=60'
             )
         ]
         
         # Add more random events
         categories = ['Technology', 'Music', 'Business', 'Art', 'Sports', 'Food', 'Education', 'Health']
         organizers = ['Event Pro', 'Global Events', 'City Events', 'Professional Organizers', 'Event Masters']
+        category_images = {
+            'Technology': 'https://images.unsplash.com/photo-1511795409834-432f31197ce6?w=800&auto=format&fit=crop&q=60',
+            'Music': 'https://images.unsplash.com/photo-1470229722913-7c0e2dbbafd3?w=800&auto=format&fit=crop&q=60',
+            'Business': 'https://images.unsplash.com/photo-1552664730-d307ca884978?w=800&auto=format&fit=crop&q=60',
+            'Art': 'https://images.unsplash.com/photo-1502877338535-766e1452684a?w=800&auto=format&fit=crop&q=60',
+            'Sports': 'https://images.unsplash.com/photo-1517649763962-0c623066013b?w=800&auto=format&fit=crop&q=60',
+            'Food': 'https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=800&auto=format&fit=crop&q=60',
+            'Education': 'https://images.unsplash.com/photo-1523580494863-6f3031224c94?w=800&auto=format&fit=crop&q=60',
+            'Health': 'https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?w=800&auto=format&fit=crop&q=60'
+        }
         for i in range(17):  # Add 17 more events to make it 20 total
             event_date = datetime.now() + timedelta(days=random.randint(1, 365))
             category = random.choice(categories)
@@ -323,7 +333,7 @@ Afternoon:
 - Company A
 - Organization B
 - Corporation C''',
-                image_url=f'https://source.unsplash.com/random/800x600/?{category.lower()}'
+                image_url=category_images[category]
             )
             events.append(event)
         
