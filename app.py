@@ -1,13 +1,22 @@
-from flask import Flask, render_template, request, redirect, url_for, flash
+from flask import Flask, render_template, request, redirect, url_for, flash, send_from_directory
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager, UserMixin, login_user, login_required, logout_user, current_user
 from werkzeug.security import generate_password_hash, check_password_hash
 from datetime import datetime, timedelta
 import random
+import os
+from werkzeug.utils import secure_filename
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'your-secret-key-here'
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///events.db'
+app.config['UPLOAD_FOLDER'] = 'static/uploads'
+app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max file size
+ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif'}
+
+# Create upload folder if it doesn't exist
+os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
+
 db = SQLAlchemy(app)
 login_manager = LoginManager()
 login_manager.init_app(app)
@@ -140,33 +149,125 @@ def logout():
     logout_user()
     return redirect(url_for('login'))
 
+@app.route('/delete_event/<int:event_id>', methods=['POST'])
+@login_required
+def delete_event(event_id):
+    event = Event.query.get_or_404(event_id)
+    
+    # Check if the current user is the creator of the event
+    if event.created_by != current_user.id:
+        flash('You can only delete events that you created.')
+        return redirect(url_for('event_details', event_id=event_id))
+    
+    # Delete the event's image file if it exists in the uploads folder
+    if event.image_url and event.image_url.startswith('/uploads/'):
+        filename = event.image_url.split('/')[-1]
+        file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+        if os.path.exists(file_path):
+            os.remove(file_path)
+    
+    # Delete the event from the database
+    db.session.delete(event)
+    db.session.commit()
+    
+    flash('Event has been successfully deleted.')
+    return redirect(url_for('dashboard'))
+
+def allowed_file(filename):
+    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+
+@app.route('/create_event', methods=['GET', 'POST'])
+@login_required
+def create_event():
+    if request.method == 'POST':
+        # Get form data
+        title = request.form['title']
+        description = request.form['description']
+        date = datetime.strptime(request.form['date'], '%Y-%m-%dT%H:%M')
+        venue = request.form['venue']
+        category = request.form['category']
+        capacity = int(request.form['capacity'])
+        price = float(request.form['price'])
+        organizer = request.form['organizer']
+        contact_email = request.form['contact_email']
+        contact_phone = request.form['contact_phone']
+        requirements = request.form.get('requirements', '')
+        schedule = request.form.get('schedule', '')
+        speakers = request.form.get('speakers', '')
+        sponsors = request.form.get('sponsors', '')
+        
+        # Handle image upload
+        image_url = request.form.get('image_url', '')
+        if 'image_file' in request.files:
+            file = request.files['image_file']
+            if file and file.filename and allowed_file(file.filename):
+                filename = secure_filename(file.filename)
+                # Add timestamp to filename to prevent duplicates
+                timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+                filename = f"{timestamp}_{filename}"
+                file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
+                image_url = url_for('uploaded_file', filename=filename)
+
+        # Create new event
+        event = Event(
+            title=title,
+            description=description,
+            date=date,
+            venue=venue,
+            category=category,
+            capacity=capacity,
+            price=price,
+            organizer=organizer,
+            contact_email=contact_email,
+            contact_phone=contact_phone,
+            requirements=requirements,
+            schedule=schedule,
+            speakers=speakers,
+            sponsors=sponsors,
+            image_url=image_url,
+            created_by=current_user.id
+        )
+
+        # Add to database
+        db.session.add(event)
+        db.session.commit()
+
+        flash('Event created successfully!')
+        return redirect(url_for('event_details', event_id=event.id))
+
+    return render_template('create_event.html')
+
+@app.route('/uploads/<filename>')
+def uploaded_file(filename):
+    return send_from_directory(app.config['UPLOAD_FOLDER'], filename)
+
 def init_db():
     with app.app_context():
-        # Drop all existing tables
-        db.drop_all()
-        # Create all tables
+        # Create all tables if they don't exist
         db.create_all()
         
-        # Create a test user
-        test_user = User(username='test')
-        test_user.set_password('test123')
-        db.session.add(test_user)
-        
-        # Create sample events with rich content
-        events = [
-            Event(
-                title='Tech Conference 2024',
-                description='Join us for the most anticipated tech conference of the year! This event brings together industry leaders, innovators, and tech enthusiasts for three days of learning, networking, and inspiration. Featuring keynote speeches, panel discussions, and hands-on workshops.',
-                date=datetime(2024, 6, 15, 9, 0),
-                venue='Convention Center, New York',
-                category='Technology',
-                capacity=1000,
-                price=299.99,
-                organizer='Tech Innovators Inc.',
-                contact_email='info@techconference.com',
-                contact_phone='+1 (555) 123-4567',
-                requirements='Laptop, Notebook, Business Cards',
-                schedule='''Day 1:
+        # Check if we need to add sample data
+        if not User.query.first():
+            # Create a test user
+            test_user = User(username='test')
+            test_user.set_password('test123')
+            db.session.add(test_user)
+            
+            # Create sample events with rich content
+            events = [
+                Event(
+                    title='Tech Conference 2024',
+                    description='Join us for the most anticipated tech conference of the year! This event brings together industry leaders, innovators, and tech enthusiasts for three days of learning, networking, and inspiration. Featuring keynote speeches, panel discussions, and hands-on workshops.',
+                    date=datetime(2024, 6, 15, 9, 0),
+                    venue='Convention Center, New York',
+                    category='Technology',
+                    capacity=1000,
+                    price=299.99,
+                    organizer='Tech Innovators Inc.',
+                    contact_email='info@techconference.com',
+                    contact_phone='+1 (555) 123-4567',
+                    requirements='Laptop, Notebook, Business Cards',
+                    schedule='''Day 1:
 - 9:00 AM: Registration
 - 10:00 AM: Opening Keynote
 - 12:00 PM: Lunch
@@ -179,11 +280,11 @@ Day 2:
 - 12:00 PM: Lunch
 - 2:00 PM: Breakout Sessions
 - 5:00 PM: Closing Remarks''',
-                speakers='''John Smith - CEO, TechCorp
+                    speakers='''John Smith - CEO, TechCorp
 Sarah Johnson - CTO, InnovateX
 Michael Brown - AI Researcher, Stanford
 Emily Davis - Product Manager, Google''',
-                sponsors='''Platinum Sponsors:
+                    sponsors='''Platinum Sponsors:
 - Microsoft
 - Amazon Web Services
 - Google Cloud
@@ -192,21 +293,21 @@ Gold Sponsors:
 - IBM
 - Oracle
 - Salesforce''',
-                image_url='https://images.unsplash.com/photo-1511795409834-432f31197ce6?w=800&auto=format&fit=crop&q=60'
-            ),
-            Event(
-                title='Music Festival 2024',
-                description='Experience three days of incredible music across multiple stages! From rock to electronic, jazz to hip-hop, this festival has something for every music lover. Join thousands of music enthusiasts for an unforgettable weekend of performances, food, and fun.',
-                date=datetime(2024, 7, 20, 18, 0),
-                venue='Central Park, New York',
-                category='Music',
-                capacity=5000,
-                price=199.99,
-                organizer='Music Events Co.',
-                contact_email='info@musicfestival.com',
-                contact_phone='+1 (555) 987-6543',
-                requirements='Valid ID, Comfortable Shoes, Sun Protection',
-                schedule='''Friday:
+                    image_url='https://images.unsplash.com/photo-1511795409834-432f31197ce6?w=800&auto=format&fit=crop&q=60'
+                ),
+                Event(
+                    title='Music Festival 2024',
+                    description='Experience three days of incredible music across multiple stages! From rock to electronic, jazz to hip-hop, this festival has something for every music lover. Join thousands of music enthusiasts for an unforgettable weekend of performances, food, and fun.',
+                    date=datetime(2024, 7, 20, 18, 0),
+                    venue='Central Park, New York',
+                    category='Music',
+                    capacity=5000,
+                    price=199.99,
+                    organizer='Music Events Co.',
+                    contact_email='info@musicfestival.com',
+                    contact_phone='+1 (555) 987-6543',
+                    requirements='Valid ID, Comfortable Shoes, Sun Protection',
+                    schedule='''Friday:
 - 6:00 PM: Gates Open
 - 7:00 PM: Opening Act
 - 9:00 PM: Headliner 1
@@ -223,12 +324,12 @@ Sunday:
 - 3:00 PM: Acoustic Stage
 - 6:00 PM: Final Headliner
 - 9:00 PM: Closing Ceremony''',
-                speakers='''Main Stage:
+                    speakers='''Main Stage:
 - The Rock Band
 - Electronic Duo
 - Jazz Ensemble
 - Hip-Hop Collective''',
-                sponsors='''Presented by:
+                    sponsors='''Presented by:
 - Spotify
 - Apple Music
 - SoundCloud
@@ -237,21 +338,21 @@ Sponsored by:
 - Red Bull
 - Coca-Cola
 - Samsung''',
-                image_url='https://images.unsplash.com/photo-1470229722913-7c0e2dbbafd3?w=800&auto=format&fit=crop&q=60'
-            ),
-            Event(
-                title='Startup Pitch Competition',
-                description='Calling all entrepreneurs! Present your innovative ideas to a panel of industry experts and potential investors. This competition offers cash prizes, mentorship opportunities, and the chance to connect with venture capitalists.',
-                date=datetime(2024, 8, 5, 14, 0),
-                venue='Innovation Hub, San Francisco',
-                category='Business',
-                capacity=200,
-                price=49.99,
-                organizer='Startup Network',
-                contact_email='pitch@startupnetwork.com',
-                contact_phone='+1 (555) 456-7890',
-                requirements='Pitch Deck, Business Plan, Demo (if applicable)',
-                schedule='''2:00 PM: Registration
+                    image_url='https://images.unsplash.com/photo-1470229722913-7c0e2dbbafd3?w=800&auto=format&fit=crop&q=60'
+                ),
+                Event(
+                    title='Startup Pitch Competition',
+                    description='Calling all entrepreneurs! Present your innovative ideas to a panel of industry experts and potential investors. This competition offers cash prizes, mentorship opportunities, and the chance to connect with venture capitalists.',
+                    date=datetime(2024, 8, 5, 14, 0),
+                    venue='Innovation Hub, San Francisco',
+                    category='Business',
+                    capacity=200,
+                    price=49.99,
+                    organizer='Startup Network',
+                    contact_email='pitch@startupnetwork.com',
+                    contact_phone='+1 (555) 456-7890',
+                    requirements='Pitch Deck, Business Plan, Demo (if applicable)',
+                    schedule='''2:00 PM: Registration
 2:30 PM: Opening Remarks
 3:00 PM: Pitch Sessions Begin
 5:00 PM: Break
@@ -259,12 +360,12 @@ Sponsored by:
 6:30 PM: Judging
 7:00 PM: Awards Ceremony
 7:30 PM: Networking Reception''',
-                speakers='''Judges:
+                    speakers='''Judges:
 - Mark Johnson - Partner, Venture Capital
 - Lisa Chen - CEO, Tech Accelerator
 - David Wilson - Angel Investor
 - Sarah Miller - Startup Advisor''',
-                sponsors='''Hosted by:
+                    sponsors='''Hosted by:
 - Y Combinator
 - TechStars
 - 500 Startups
@@ -273,74 +374,14 @@ Supported by:
 - Silicon Valley Bank
 - Stripe
 - AWS Startups''',
-                image_url='https://images.unsplash.com/photo-1552664730-d307ca884978?w=800&auto=format&fit=crop&q=60'
-            )
-        ]
-        
-        # Add more random events
-        categories = ['Technology', 'Music', 'Business', 'Art', 'Sports', 'Food', 'Education', 'Health']
-        organizers = ['Event Pro', 'Global Events', 'City Events', 'Professional Organizers', 'Event Masters']
-        category_images = {
-            'Technology': 'https://images.unsplash.com/photo-1511795409834-432f31197ce6?w=800&auto=format&fit=crop&q=60',
-            'Music': 'https://images.unsplash.com/photo-1470229722913-7c0e2dbbafd3?w=800&auto=format&fit=crop&q=60',
-            'Business': 'https://images.unsplash.com/photo-1552664730-d307ca884978?w=800&auto=format&fit=crop&q=60',
-            'Art': 'https://images.unsplash.com/photo-1502877338535-766e1452684a?w=800&auto=format&fit=crop&q=60',
-            'Sports': 'https://images.unsplash.com/photo-1517649763962-0c623066013b?w=800&auto=format&fit=crop&q=60',
-            'Food': 'https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=800&auto=format&fit=crop&q=60',
-            'Education': 'https://images.unsplash.com/photo-1523580494863-6f3031224c94?w=800&auto=format&fit=crop&q=60',
-            'Health': 'https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?w=800&auto=format&fit=crop&q=60'
-        }
-        for i in range(17):  # Add 17 more events to make it 20 total
-            event_date = datetime.now() + timedelta(days=random.randint(1, 365))
-            category = random.choice(categories)
-            event = Event(
-                title=f'{category} Event {event_date.year}',
-                description=f'Join us for an amazing {category.lower()} event featuring special guests and exciting activities. This event promises to be an unforgettable experience with expert speakers, interactive sessions, and networking opportunities.',
-                date=event_date,
-                venue=random.choice([
-                    'Convention Center, New York',
-                    'Central Park, New York',
-                    'Innovation Hub, San Francisco',
-                    'Tech Park, Silicon Valley',
-                    'Music Hall, Los Angeles',
-                    'Business Center, Chicago',
-                    'Art Gallery, Miami',
-                    'Sports Arena, Boston',
-                    'Conference Center, Seattle',
-                    'Exhibition Hall, Las Vegas'
-                ]),
-                category=category,
-                capacity=random.randint(100, 1000),
-                price=random.uniform(49.99, 299.99),
-                organizer=random.choice(organizers),
-                contact_email=f'info@{category.lower()}event.com',
-                contact_phone=f'+1 (555) {random.randint(100,999)}-{random.randint(1000,9999)}',
-                requirements='Valid ID, Registration Confirmation',
-                schedule='''Morning:
-- 9:00 AM: Registration
-- 10:00 AM: Opening Session
-- 12:00 PM: Lunch
-
-Afternoon:
-- 2:00 PM: Main Activities
-- 4:00 PM: Breakout Sessions
-- 6:00 PM: Closing Remarks''',
-                speakers='''Featured Speakers:
-- Industry Expert 1
-- Professional Speaker 2
-- Special Guest 3''',
-                sponsors='''Sponsored by:
-- Company A
-- Organization B
-- Corporation C''',
-                image_url=category_images[category]
-            )
-            events.append(event)
-        
-        for event in events:
-            db.session.add(event)
-        
-        db.session.commit()
+                    image_url='https://images.unsplash.com/photo-1552664730-d307ca884978?w=800&auto=format&fit=crop&q=60'
+                )
+            ]
+            
+            for event in events:
+                db.session.add(event)
+            
+            db.session.commit()
 
 if __name__ == '__main__':
     init_db()

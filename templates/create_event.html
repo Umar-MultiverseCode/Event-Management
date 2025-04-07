@@ -1,0 +1,174 @@
+{% extends "base.html" %}
+
+{% block title %}Create Event{% endblock %}
+
+{% block content %}
+<div class="card">
+    <h2>Create New Event</h2>
+    <form method="POST" action="{{ url_for('create_event') }}" class="form-container" enctype="multipart/form-data">
+        <div class="form-group">
+            <label for="title">Event Title</label>
+            <input type="text" id="title" name="title" required>
+        </div>
+
+        <div class="form-group">
+            <label for="description">Description</label>
+            <textarea id="description" name="description" rows="4" required></textarea>
+        </div>
+
+        <div class="form-group">
+            <label for="date">Date and Time</label>
+            <input type="datetime-local" id="date" name="date" required>
+        </div>
+
+        <div class="form-group">
+            <label for="venue">Venue</label>
+            <input type="text" id="venue" name="venue" required>
+        </div>
+
+        <div class="form-group">
+            <label for="category">Category</label>
+            <select id="category" name="category" required>
+                <option value="Technology">Technology</option>
+                <option value="Music">Music</option>
+                <option value="Business">Business</option>
+                <option value="Art">Art</option>
+                <option value="Sports">Sports</option>
+                <option value="Food">Food</option>
+                <option value="Education">Education</option>
+                <option value="Health">Health</option>
+            </select>
+        </div>
+
+        <div class="form-group">
+            <label for="capacity">Capacity</label>
+            <input type="number" id="capacity" name="capacity" min="1" required>
+        </div>
+
+        <div class="form-group">
+            <label for="price">Price ($)</label>
+            <input type="number" id="price" name="price" min="0" step="0.01" required>
+        </div>
+
+        <div class="form-group">
+            <label for="organizer">Organizer</label>
+            <input type="text" id="organizer" name="organizer" required>
+        </div>
+
+        <div class="form-group">
+            <label for="contact_email">Contact Email</label>
+            <input type="email" id="contact_email" name="contact_email" required>
+        </div>
+
+        <div class="form-group">
+            <label for="contact_phone">Contact Phone</label>
+            <input type="tel" id="contact_phone" name="contact_phone" required>
+        </div>
+
+        <div class="form-group">
+            <label for="requirements">Requirements</label>
+            <textarea id="requirements" name="requirements" rows="3"></textarea>
+        </div>
+
+        <div class="form-group">
+            <label for="schedule">Schedule</label>
+            <textarea id="schedule" name="schedule" rows="5"></textarea>
+        </div>
+
+        <div class="form-group">
+            <label for="speakers">Speakers</label>
+            <textarea id="speakers" name="speakers" rows="3"></textarea>
+        </div>
+
+        <div class="form-group">
+            <label for="sponsors">Sponsors</label>
+            <textarea id="sponsors" name="sponsors" rows="3"></textarea>
+        </div>
+
+        <div class="form-group">
+            <label for="image_url">Image URL</label>
+            <input type="url" id="image_url" name="image_url" placeholder="https://example.com/image.jpg">
+            <p class="form-help">OR</p>
+            <label for="image_file">Upload Image</label>
+            <input type="file" id="image_file" name="image_file" accept="image/*">
+            <p class="form-help">Please provide either an image URL or upload an image file</p>
+        </div>
+
+        <div class="form-actions">
+            <button type="submit" class="btn">Create Event</button>
+            <a href="{{ url_for('dashboard') }}" class="btn">Cancel</a>
+        </div>
+    </form>
+</div>
+
+<style>
+    .form-container {
+        max-width: 800px;
+        margin: 0 auto;
+        padding: 30px;
+    }
+
+    .form-group {
+        margin-bottom: 20px;
+    }
+
+    .form-group label {
+        display: block;
+        margin-bottom: 8px;
+        font-weight: 500;
+        color: #2c3e50;
+    }
+
+    .form-group input,
+    .form-group select,
+    .form-group textarea {
+        width: 100%;
+        padding: 12px;
+        border: 2px solid var(--border-color);
+        border-radius: 8px;
+        background-color: var(--input-bg);
+        color: var(--text-color);
+        font-size: 1rem;
+    }
+
+    .form-group textarea {
+        resize: vertical;
+        min-height: 100px;
+    }
+
+    .form-actions {
+        display: flex;
+        gap: 15px;
+        margin-top: 30px;
+    }
+
+    .form-actions .btn {
+        flex: 1;
+    }
+
+    @media (max-width: 768px) {
+        .form-container {
+            padding: 20px;
+        }
+        
+        .form-actions {
+            flex-direction: column;
+        }
+    }
+
+    .form-help {
+        font-size: 0.85rem;
+        color: #6c757d;
+        margin: 5px 0;
+    }
+    .form-group input[type="file"] {
+        padding: 8px;
+        border: 2px dashed var(--border-color);
+        background-color: var(--input-bg);
+        cursor: pointer;
+    }
+    .form-group input[type="file"]:hover {
+        border-color: #3498db;
+    }
+</style>
+{% endblock %} 
